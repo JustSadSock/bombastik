@@ -11,6 +11,8 @@ const DEFAULT_EXPLOSION_SCENE := preload("res://scenes/Explosion.tscn")
 @export var sprint_multiplier := 1.6
 @export var crouch_multiplier := 0.6
 @export var jump_velocity := 4.5
+@export var slide_speed := 16.0
+@export var slide_duration := 0.55
 @export var camera_sensitivity := 0.002
 @export var head_bob_speed := 6.0
 @export var head_bob_amount := 0.02
@@ -30,6 +32,8 @@ var weapon_rest_position := Vector3.ZERO
 var is_dead := false
 var wants_recap_mouse := true
 var force_move_input := Vector2.ZERO
+var slide_time := 0.0
+var slide_direction := Vector3.ZERO
 
 @onready var head: Node3D = $Head
 @onready var camera: Camera3D = $Head/Camera3D
@@ -63,6 +67,8 @@ func _input(event):
         head.rotation_degrees.x = clamp(head.rotation_degrees.x, -80, 80)
     if event is InputEventMouseButton and event.pressed:
         recapture_mouse()
+        if event.button_index == MOUSE_BUTTON_LEFT:
+            shoot()
     if event is InputEventKey and event.pressed and event.keycode == KEY_ESCAPE:
         Input.set_mouse_mode(Input.MOUSE_MODE_VISIBLE)
     if event.is_pressed() and (event.is_action("fire") or event.is_action("jump") or event.is_action("move_forward")
@@ -98,11 +104,20 @@ func _physics_process(delta):
         input_dir = force_move_input.normalized()
     var direction = (transform.basis * Vector3(input_dir.x, 0, input_dir.y)).normalized()
     var is_crouching = Input.is_action_pressed("crouch")
+    if Input.is_action_just_pressed("crouch") and is_on_floor() and direction.length() > 0.1 and slide_time <= 0.0:
+        start_slide(direction)
     var target_speed = speed * (sprint_multiplier if Input.is_action_pressed("sprint") and not is_crouching else 1.0)
-    if is_crouching:
-        target_speed *= crouch_multiplier
-    velocity.x = direction.x * target_speed
-    velocity.z = direction.z * target_speed
+    if slide_time > 0.0:
+        var slide_ratio = slide_time / slide_duration
+        velocity.x = slide_direction.x * slide_speed * slide_ratio
+        velocity.z = slide_direction.z * slide_speed * slide_ratio
+        slide_time = max(0.0, slide_time - delta)
+        is_crouching = true
+    else:
+        if is_crouching:
+            target_speed *= crouch_multiplier
+        velocity.x = direction.x * target_speed
+        velocity.z = direction.z * target_speed
     if Input.is_action_just_pressed("jump") and is_on_floor():
         velocity.y = jump_velocity
     move_and_slide()
@@ -257,3 +272,9 @@ func apply_headbob(delta: float, _direction: Vector3):
 
 func apply_recoil():
     head.rotation.x = clamp(head.rotation.x - 0.006, deg_to_rad(-80), deg_to_rad(80))
+
+func start_slide(direction: Vector3):
+    slide_direction = direction.normalized()
+    if slide_direction == Vector3.ZERO:
+        slide_direction = -head.global_transform.basis.z.normalized()
+    slide_time = slide_duration

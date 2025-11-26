@@ -7,8 +7,10 @@ const DEFAULT_PLAYER_SCENE := preload("res://scenes/Player.tscn")
 const DEFAULT_ENEMY_SCENE := preload("res://scenes/Enemy.tscn")
 const DEFAULT_PICKUP_SCENE := preload("res://scenes/WeaponPickup.tscn")
 
-@export var grid_size := Vector2i(6, 6)
-@export var tile_size := 12.0
+@export var grid_size := Vector2i(10, 10)
+@export var tile_size := 6.0
+@export var tile_height_variation := 0.45
+@export var cover_chance := 0.18
 @export var tile_scene: PackedScene = DEFAULT_TILE_SCENE
 @export var player_scene: PackedScene = DEFAULT_PLAYER_SCENE
 @export var enemy_scene: PackedScene = DEFAULT_ENEMY_SCENE
@@ -59,12 +61,43 @@ func clear_game():
 func generate_level():
     for x in range(grid_size.x):
         for y in range(grid_size.y):
-            if rng.randf() < 0.12 and not (x == grid_size.x / 2.0 and y == grid_size.y / 2.0):
-                continue
             var tile = tile_scene.instantiate()
-            tile.position = Vector3(x * tile_size, 0, y * tile_size)
+            var height_offset = rng.randf_range(-tile_height_variation, tile_height_variation)
+            tile.position = Vector3(x * tile_size, height_offset, y * tile_size)
+            tile.rotation_degrees.y = rng.randf_range(-4.0, 4.0)
             level_root.add_child(tile)
-            floor_positions.append(tile.global_transform.origin)
+            floor_positions.append(tile.global_transform.origin + Vector3(0, 0.55, 0))
+            _maybe_add_cover(tile)
+
+func _maybe_add_cover(tile: Node3D):
+    if rng.randf() > cover_chance:
+        return
+    var obstacle := StaticBody3D.new()
+    obstacle.name = "Cover"
+    var mesh_instance := MeshInstance3D.new()
+    var mesh := BoxMesh.new()
+    mesh.size = Vector3(rng.randf_range(1.2, 1.8), rng.randf_range(0.8, 1.6), rng.randf_range(1.2, 1.8))
+    mesh_instance.mesh = mesh
+    var mat := StandardMaterial3D.new()
+    mat.albedo_color = Color(0.28, 0.34, 0.4)
+    mat.roughness = 0.6
+    mesh_instance.material_override = mat
+    obstacle.add_child(mesh_instance)
+
+    var shape := CollisionShape3D.new()
+    var box_shape := BoxShape3D.new()
+    box_shape.size = mesh.size
+    shape.shape = box_shape
+    shape.position.y = mesh.size.y * 0.5
+    obstacle.add_child(shape)
+
+    obstacle.position = Vector3(
+        rng.randf_range(-tile_size * 0.35, tile_size * 0.35),
+        mesh.size.y * 0.5,
+        rng.randf_range(-tile_size * 0.35, tile_size * 0.35)
+    )
+    obstacle.rotation_degrees.y = rng.randf_range(0, 360)
+    tile.add_child(obstacle)
 
 func spawn_player():
     player = player_scene.instantiate()

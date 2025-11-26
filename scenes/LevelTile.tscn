@@ -3,9 +3,10 @@
 [ext_resource type="Material" path="res://materials/tile_material.tres" id="1"]
 
 [sub_resource type="PlaneMesh" id="1"]
+size = Vector2( 6, 6 )
 
 [sub_resource type="BoxShape3D" id="2"]
-size = Vector3( 5, 0.1, 5 )
+size = Vector3( 6, 0.2, 6 )
 
 [sub_resource type="NavigationMesh" id="3"]
 
