@@ -1,0 +1,21 @@
+[gd_scene load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://scripts/enemy.gd" id="1"]
+[ext_resource type="Material" path="res://materials/enemy_material.tres" id="2"]
+
+[node name="Enemy" type="CharacterBody3D"]
+script = ExtResource( 1 )
+explosion_scene = preload("res://scenes/Explosion.tscn")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="."]
+shape = CapsuleShape3D.new()
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="."]
+mesh = CapsuleMesh.new()
+material_override = ExtResource( 2 )
+
+[node name="Eye" type="OmniLight3D" parent="."]
+range = 6.0
+light_energy = 0.6
+color = Color(1, 0.2, 0.15)
+
