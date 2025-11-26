@@ -36,7 +36,7 @@ func generate_level():
         child.queue_free()
     for x in range(grid_size.x):
         for y in range(grid_size.y):
-            if rng.randf() < 0.12 and not (x == grid_size.x / 2 and y == grid_size.y / 2):
+            if rng.randf() < 0.12 and not (x == grid_size.x / 2.0 and y == grid_size.y / 2.0):
                 continue
             var tile = tile_scene.instantiate()
             tile.position = Vector3(x * tile_size, 0, y * tile_size)
@@ -57,20 +57,21 @@ func spawn_pickups():
         var pickup = pickup_scene.instantiate()
         pickup.weapon_id = data.get("id")
         pickup.display_name = data.get("name")
-        var position = get_random_floor_position() + Vector3(0, 0.5, 0)
-        pickup.global_transform.origin = position
+        var pickup_position = get_random_floor_position() + Vector3(0, 0.5, 0)
         var label = pickup.get_node_or_null("Label3D")
         if label:
             label.text = data.get("name")
         container.add_child(pickup)
+        pickup.global_transform.origin = pickup_position
 
 func spawn_enemies():
     var container = $Enemies
     for i in range(8):
         var enemy = enemy_scene.instantiate()
         enemy.target = player
-        enemy.global_transform.origin = get_random_floor_position() + Vector3(0, 0.5, 0)
+        var enemy_position = get_random_floor_position() + Vector3(0, 0.5, 0)
         container.add_child(enemy)
+        enemy.global_transform.origin = enemy_position
 
 func get_random_floor_position() -> Vector3:
     if floor_positions.is_empty():

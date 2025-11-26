@@ -159,7 +159,7 @@ func apply_crouch(delta: float, is_crouching: bool):
     if shape:
         shape.height = lerp(shape.height, 1.2 if is_crouching else 1.8, 8.0 * delta)
 
-func apply_headbob(delta: float, direction: Vector3):
+func apply_headbob(delta: float, _direction: Vector3):
     var horizontal_speed = Vector2(velocity.x, velocity.z).length()
     if is_on_floor() and horizontal_speed > 0.5:
         bob_time += delta * head_bob_speed * clamp(horizontal_speed / speed, 0.6, 2.0)
