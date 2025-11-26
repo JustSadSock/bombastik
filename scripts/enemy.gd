@@ -272,7 +272,7 @@ func _apply_variant_style():
         if mesh:
             _tint_mesh(mesh, style.get("accent", _get_mesh_color(mesh)))
     if glow:
-        glow.color = style.get("light", glow.color)
+        glow.light_color = style.get("light", glow.light_color)
         glow.light_energy = 1.0 + rng.randf_range(-0.1, 0.3)
     _spawn_attachments(style.get("attachments", []), style.get("accent", Color(0.9, 0.9, 0.9)))
 
