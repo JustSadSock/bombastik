@@ -166,7 +166,7 @@ func apply_headbob(delta: float, direction: Vector3):
         var bob_offset = sin(bob_time) * head_bob_amount
         weapon_mesh.position = weapon_mesh.position.lerp(weapon_rest_position + Vector3(0, bob_offset, 0), 10.0 * delta)
         weapon_mesh.rotation.z = lerp(weapon_mesh.rotation.z, sin(bob_time * 2.0) * head_bob_amount * 2.5, 8.0 * delta)
-        if step_audio and not step_audio.playing and bob_time % PI < 0.1:
+        if step_audio and not step_audio.playing and fmod(bob_time, PI) < 0.1:
             step_audio.play()
     else:
         bob_time = 0.0
