@@ -6,8 +6,8 @@
 [ext_resource type="PackedScene" path="res://scenes/Explosion.tscn" id="4"]
 
 [sub_resource type="CapsuleShape3D" id="1"]
-radius = 0.5
-height = 1.0
+radius = 0.55
+height = 1.5
 
 [sub_resource type="BoxMesh" id="2"]
 size = Vector3(0.82, 1.2, 0.64)
@@ -67,10 +67,10 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.18, -0.64)
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.2, 0)
 range = 7.0
 light_energy = 0.9
-color = Color(0.95, 0.52, 0.26, 1)
+light_color = Color(0.95, 0.52, 0.26, 1)
 
 [node name="HealthLabel" type="Label3D" parent="."]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 2.05, 0)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 2.3, 0)
 alignment = 1
 billboard = 1
 modulate = Color(1, 0.92, 0.85, 1)

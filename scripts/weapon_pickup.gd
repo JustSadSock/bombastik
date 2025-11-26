@@ -16,7 +16,7 @@ func _process(delta):
 func _on_body_entered(body):
     if body.has_method("pickup_weapon"):
         body.pickup_weapon(weapon_id)
-        queue_free()
+        call_deferred("queue_free")
 
 func _apply_visuals():
     var weapon_data := _get_weapon_data()

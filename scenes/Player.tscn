@@ -11,6 +11,8 @@
 [ext_resource type="Material" path="res://materials/weapon_metal_material.tres" id="9"]
 
 [sub_resource type="CapsuleShape3D" id="1"]
+radius = 0.45
+height = 1.6
 
 [sub_resource type="CapsuleMesh" id="2"]
 

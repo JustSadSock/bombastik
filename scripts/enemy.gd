@@ -34,6 +34,147 @@ const VARIANT_STYLES := [
     },
 ]
 
+const MELEE_VARIANTS := [
+    {
+        "id": "brute",
+        "health": 140.0,
+        "damage": 28.0,
+        "speed": 5.6,
+        "strafe_speed": 4.6,
+        "melee_range": 2.8,
+        "visual_scale": 1.2,
+        "body_mesh": {"type": "box", "size": Vector3(0.96, 1.8, 0.82)},
+        "head_mesh": {"type": "cylinder", "height": 0.52, "top_radius": 0.36, "bottom_radius": 0.38},
+        "visor_mesh": {"type": "prism", "size": Vector3(0.32, 0.22, 0.72), "origin": Vector3(0, 1.05, -0.38)},
+        "harness_mesh": {"type": "cylinder", "height": 0.54, "top_radius": 0.34, "bottom_radius": 0.36, "origin": Vector3(0, 0.6, 0)},
+        "style_override": {
+            "body": Color(0.78, 0.36, 0.32),
+            "accent": Color(1.0, 0.48, 0.24),
+            "light": Color(1.06, 0.56, 0.3),
+            "attachments": [
+                {"type": "pauldron", "offset": Vector3(0.52, 0.62, 0)},
+                {"type": "blade", "offset": Vector3(-0.5, 0.44, -0.12)},
+            ],
+        },
+    },
+    {
+        "id": "skirmisher",
+        "health": 110.0,
+        "damage": 18.0,
+        "speed": 7.4,
+        "strafe_speed": 6.2,
+        "melee_range": 2.4,
+        "visual_scale": 1.1,
+        "body_mesh": {"type": "prism", "size": Vector3(0.82, 1.55, 0.72)},
+        "head_mesh": {"type": "cylinder", "height": 0.46, "top_radius": 0.3, "bottom_radius": 0.32},
+        "visor_mesh": {"type": "prism", "size": Vector3(0.28, 0.18, 0.62), "origin": Vector3(0, 0.96, -0.34)},
+        "harness_mesh": {"type": "capsule", "radius": 0.26, "height": 0.64, "origin": Vector3(0, 0.48, 0)},
+        "style_override": {
+            "body": Color(0.38, 0.64, 0.92),
+            "accent": Color(0.32, 0.92, 0.72),
+            "light": Color(0.4, 0.94, 0.88),
+            "attachments": [
+                {"type": "antenna", "offset": Vector3(0.2, 1.18, -0.12)},
+                {"type": "visor_ridge", "offset": Vector3(0, 1.0, -0.4)},
+            ],
+        },
+    },
+    {
+        "id": "vanguard",
+        "health": 125.0,
+        "damage": 22.0,
+        "speed": 6.4,
+        "strafe_speed": 5.4,
+        "melee_range": 2.6,
+        "visual_scale": 1.18,
+        "body_mesh": {"type": "cylinder", "height": 1.65, "top_radius": 0.42, "bottom_radius": 0.5},
+        "head_mesh": {"type": "box", "size": Vector3(0.42, 0.46, 0.42)},
+        "visor_mesh": {"type": "torus", "inner_radius": 0.14, "outer_radius": 0.26, "ring_segments": 20, "rings": 12, "origin": Vector3(0, 0.96, -0.2)},
+        "harness_mesh": {"type": "prism", "size": Vector3(0.48, 0.32, 0.48), "origin": Vector3(0, 0.6, 0)},
+        "style_override": {
+            "body": Color(0.6, 0.48, 0.82),
+            "accent": Color(0.78, 0.56, 1.0),
+            "light": Color(1.02, 0.72, 1.1),
+            "attachments": [
+                {"type": "backpack", "offset": Vector3(0, 0.52, 0.4)},
+                {"type": "shoulder_plate", "offset": Vector3(0.48, 0.48, 0)},
+            ],
+        },
+    },
+]
+
+const RANGED_VARIANTS := [
+    {
+        "id": "artillerist",
+        "health": 105.0,
+        "damage": 16.0,
+        "speed": 5.8,
+        "strafe_speed": 6.2,
+        "preferred_distance": 13.5,
+        "ranged_range": 21.0,
+        "visual_scale": 1.15,
+        "body_mesh": {"type": "box", "size": Vector3(0.9, 1.5, 0.7)},
+        "head_mesh": {"type": "capsule", "radius": 0.32, "height": 0.38},
+        "visor_mesh": {"type": "prism", "size": Vector3(0.32, 0.2, 0.62), "origin": Vector3(0, 0.92, -0.36)},
+        "harness_mesh": {"type": "cylinder", "height": 0.54, "top_radius": 0.3, "bottom_radius": 0.32, "origin": Vector3(0, 0.52, 0)},
+        "style_override": {
+            "body": Color(0.34, 0.58, 0.98),
+            "accent": Color(0.44, 0.82, 1.0),
+            "light": Color(0.42, 0.86, 1.1),
+            "attachments": [
+                {"type": "antenna", "offset": Vector3(0.16, 1.14, -0.2)},
+                {"type": "shoulder_plate", "offset": Vector3(-0.42, 0.52, 0)},
+            ],
+        },
+    },
+    {
+        "id": "marksman",
+        "health": 90.0,
+        "damage": 14.0,
+        "speed": 6.6,
+        "strafe_speed": 6.8,
+        "preferred_distance": 15.0,
+        "ranged_range": 22.5,
+        "visual_scale": 1.08,
+        "body_mesh": {"type": "prism", "size": Vector3(0.76, 1.46, 0.68)},
+        "head_mesh": {"type": "cylinder", "height": 0.36, "top_radius": 0.28, "bottom_radius": 0.3},
+        "visor_mesh": {"type": "box", "size": Vector3(0.28, 0.2, 0.5), "origin": Vector3(0, 0.9, -0.34)},
+        "harness_mesh": {"type": "capsule", "radius": 0.24, "height": 0.5, "origin": Vector3(0, 0.48, 0)},
+        "style_override": {
+            "body": Color(0.28, 0.74, 0.74),
+            "accent": Color(0.32, 1.0, 0.86),
+            "light": Color(0.48, 1.02, 0.92),
+            "attachments": [
+                {"type": "visor_ridge", "offset": Vector3(0, 0.9, -0.32)},
+                {"type": "blade", "offset": Vector3(0.42, 0.36, -0.1)},
+            ],
+        },
+    },
+    {
+        "id": "suppressor",
+        "health": 120.0,
+        "damage": 18.0,
+        "speed": 5.4,
+        "strafe_speed": 5.8,
+        "preferred_distance": 11.0,
+        "ranged_range": 19.5,
+        "visual_scale": 1.22,
+        "body_mesh": {"type": "cylinder", "height": 1.58, "top_radius": 0.44, "bottom_radius": 0.46},
+        "head_mesh": {"type": "box", "size": Vector3(0.38, 0.42, 0.4)},
+        "visor_mesh": {"type": "torus", "inner_radius": 0.12, "outer_radius": 0.22, "ring_segments": 18, "rings": 12, "origin": Vector3(0, 0.92, -0.18)},
+        "harness_mesh": {"type": "box", "size": Vector3(0.5, 0.34, 0.5), "origin": Vector3(0, 0.54, 0)},
+        "style_override": {
+            "body": Color(0.52, 0.48, 0.72),
+            "accent": Color(0.78, 0.62, 1.02),
+            "light": Color(0.98, 0.72, 1.06),
+            "attachments": [
+                {"type": "backpack", "offset": Vector3(0, 0.48, 0.38)},
+                {"type": "pauldron", "offset": Vector3(-0.48, 0.58, 0)},
+            ],
+        },
+    },
+]
+
 @export_enum("melee", "ranged") var attack_type := "melee"
 @export var speed := 6.0
 @export var strafe_speed := 4.5
@@ -65,6 +206,7 @@ var base_visual_height := 0.0
 var strafe_jitter := Vector3.ZERO
 var jitter_timer := 0.0
 var rng := RandomNumberGenerator.new()
+var chosen_variant := {}
 
 @onready var visual: Node3D = $Visual
 @onready var health_label: Label3D = $HealthLabel
@@ -82,7 +224,7 @@ func _ready():
     explosion_scene = explosion_scene if explosion_scene else DEFAULT_EXPLOSION_SCENE
     projectile_scene = projectile_scene if projectile_scene else DEFAULT_PROJECTILE_SCENE
     base_visual_height = visual.position.y
-    _apply_variant_style()
+    _apply_variant_profile()
     update_health_label()
 
 func _physics_process(delta):
@@ -264,12 +406,57 @@ func _animate_death():
     var tween := create_tween()
     tween.tween_property(visual, "rotation_degrees:z", 30.0, death_fade_time * 0.4).set_trans(Tween.TRANS_BACK)
     tween.tween_property(visual, "position:y", visual.position.y - 0.8, death_fade_time * 0.6).set_trans(Tween.TRANS_SINE)
-    tween.parallel().tween_property(visual, "modulate:a", 0.0, death_fade_time).set_ease(Tween.EASE_IN)
+    tween.parallel().tween_property(visual, "scale", visual.scale * 0.1, death_fade_time).set_ease(Tween.EASE_IN)
 
-func _apply_variant_style():
-    var style = VARIANT_STYLES[rng.randi_range(0, VARIANT_STYLES.size() - 1)]
+func _apply_variant_profile():
+    var pool: Array = RANGED_VARIANTS if attack_type == "ranged" else MELEE_VARIANTS
+    chosen_variant = pool[rng.randi_range(0, pool.size() - 1)]
+
+    health = chosen_variant.get("health", health)
+    damage = chosen_variant.get("damage", damage)
+    speed = chosen_variant.get("speed", speed)
+    strafe_speed = chosen_variant.get("strafe_speed", strafe_speed)
+    melee_range = chosen_variant.get("melee_range", melee_range)
+    ranged_range = chosen_variant.get("ranged_range", ranged_range)
+    preferred_ranged_distance = chosen_variant.get("preferred_distance", preferred_ranged_distance)
+    idle_sway_amount = max(idle_sway_amount, 0.04)
+    _apply_variant_geometry(chosen_variant)
+    _apply_variant_style(chosen_variant.get("style_override"))
+    update_health_label()
+
+func _apply_variant_geometry(variant: Dictionary):
+    var scale_multiplier: float = variant.get("visual_scale", 1.15)
+    visual.scale = Vector3.ONE * scale_multiplier
+    _assign_mesh(body_mesh, variant.get("body_mesh", {}))
+    _assign_mesh(head_mesh, variant.get("head_mesh", {}))
+    if $Visual.has_node("Visor"):
+        _assign_mesh($Visual/Visor, variant.get("visor_mesh", {}))
+    if $Visual.has_node("Joints"):
+        _assign_mesh($Visual/Joints, variant.get("harness_mesh", {}))
+    if $Visual.has_node("Harness"):
+        _assign_mesh($Visual/Harness, variant.get("harness_mesh", {}))
+    if muzzle:
+        muzzle.position.y = variant.has("muzzle_height") and variant.get("muzzle_height") or muzzle.position.y
+    eye_height = max(1.35, variant.get("eye_height", eye_height * scale_multiplier))
+    if hitbox and hitbox.shape is CapsuleShape3D:
+        var capsule: CapsuleShape3D = hitbox.shape
+        capsule.radius = 0.55 * scale_multiplier
+        capsule.height = 1.5 * scale_multiplier
+    if health_label:
+        var target_height: float = 2.2 * scale_multiplier
+        health_label.position.y = target_height
+
+func _apply_variant_style(style_override: Dictionary = {}):
+    var style: Dictionary = style_override if not style_override.is_empty() else VARIANT_STYLES[rng.randi_range(0, VARIANT_STYLES.size() - 1)]
     _tint_mesh(body_mesh, style.get("body", Color.WHITE))
     _tint_mesh(head_mesh, style.get("body", Color.WHITE))
+    accent_meshes.clear()
+    var visor := $Visual.get_node_or_null("Visor")
+    var harness := $Visual.get_node_or_null("Harness") or $Visual.get_node_or_null("Joints")
+    if visor:
+        accent_meshes.append(visor)
+    if harness:
+        accent_meshes.append(harness)
     for mesh in accent_meshes:
         if mesh:
             _tint_mesh(mesh, style.get("accent", _get_mesh_color(mesh)))
@@ -316,6 +503,54 @@ func _spawn_attachments(attachments: Array, accent: Color):
         mesh_instance.rotation_degrees = Vector3(rng.randf_range(-8, 8), rng.randf_range(0, 360), rng.randf_range(-8, 8))
         if mesh_instance.mesh:
             visual.add_child(mesh_instance)
+
+func _assign_mesh(node: MeshInstance3D, data: Dictionary):
+    if node == null:
+        return
+    var new_mesh := _build_variant_mesh(data)
+    if new_mesh:
+        node.mesh = new_mesh
+    if data.has("origin"):
+        node.position = data.get("origin")
+    if data.has("rotation_degrees"):
+        node.rotation_degrees = data.get("rotation_degrees")
+    if data.has("scale"):
+        node.scale = data.get("scale")
+
+func _build_variant_mesh(data: Dictionary) -> Mesh:
+    if data.is_empty():
+        return null
+    match data.get("type"):
+        "box":
+            var box := BoxMesh.new()
+            box.size = data.get("size", Vector3.ONE)
+            return box
+        "prism":
+            var prism := PrismMesh.new()
+            prism.size = data.get("size", Vector3.ONE)
+            return prism
+        "cylinder":
+            var cylinder := CylinderMesh.new()
+            cylinder.height = data.get("height", 1.0)
+            cylinder.top_radius = data.get("top_radius", 0.35)
+            cylinder.bottom_radius = data.get("bottom_radius", 0.35)
+            cylinder.radial_segments = data.get("segments", 18)
+            return cylinder
+        "capsule":
+            var capsule := CapsuleMesh.new()
+            capsule.radius = data.get("radius", 0.32)
+            capsule.height = data.get("height", 0.6)
+            capsule.radial_segments = data.get("segments", 12)
+            return capsule
+        "torus":
+            var torus := TorusMesh.new()
+            torus.inner_radius = data.get("inner_radius", 0.12)
+            torus.outer_radius = data.get("outer_radius", 0.24)
+            torus.ring_segments = data.get("ring_segments", 12)
+            torus.rings = data.get("rings", 10)
+            return torus
+        _:
+            return null
 
 func _build_attachment_mesh(kind: String) -> Mesh:
     match kind:

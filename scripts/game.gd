@@ -10,7 +10,7 @@ const DEFAULT_PICKUP_SCENE := preload("res://scenes/WeaponPickup.tscn")
 
 @export var grid_size := Vector2i(14, 14)
 @export var tile_size := 6.5
-@export var tile_height_variation := 0.45
+@export var tile_height_variation := 0.05
 @export var cover_chance := 0.18
 @export var tile_scene: PackedScene = DEFAULT_TILE_SCENE
 @export var player_scene: PackedScene = DEFAULT_PLAYER_SCENE
@@ -67,7 +67,7 @@ func generate_level():
             var tile = tile_scene.instantiate()
             var height_offset = rng.randf_range(-tile_height_variation, tile_height_variation)
             tile.position = Vector3(x * tile_size, height_offset, y * tile_size)
-            tile.rotation_degrees.y = rng.randf_range(-4.0, 4.0)
+            tile.rotation_degrees.y = rng.randf_range(-1.2, 1.2)
             level_root.add_child(tile)
             floor_positions.append(tile.global_transform.origin + Vector3(0, 0.55, 0))
             _maybe_add_cover(tile)

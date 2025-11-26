@@ -21,6 +21,16 @@ const WEAPONS = [
                 {"type": "cylinder", "height": 0.5, "top_radius": 0.07, "bottom_radius": 0.07, "segments": 16, "origin": Vector3(0, 0.05, 0.28), "rotation_degrees": Vector3(90, 0, 0)}
             ]
         },
+        "weapon_model": {
+            "type": "composite",
+            "parts": [
+                {"type": "box", "size": Vector3(0.32, 0.18, 0.5), "origin": Vector3(0, 0.04, -0.08)},
+                {"type": "cylinder", "height": 0.36, "top_radius": 0.08, "bottom_radius": 0.08, "segments": 16, "origin": Vector3(0, -0.02, 0.18), "rotation_degrees": Vector3(90, 0, 0)},
+                {"type": "box", "size": Vector3(0.16, 0.22, 0.12), "origin": Vector3(-0.12, -0.1, -0.02)}
+            ],
+            "offset": Vector3(0.02, -0.04, -0.14),
+            "scale": 0.55
+        },
         "projectile_mesh": {
             "type": "composite",
             "parts": [
@@ -49,6 +59,17 @@ const WEAPONS = [
                 {"type": "cylinder", "height": 0.34, "top_radius": 0.09, "bottom_radius": 0.09, "segments": 14, "origin": Vector3(0.1, 0.12, 0.3), "rotation_degrees": Vector3(90, 0, 0)},
                 {"type": "capsule", "radius": 0.08, "height": 0.5, "segments": 14, "origin": Vector3(0.24, 0.06, 0), "rotation_degrees": Vector3(0, 0, 90)}
             ]
+        },
+        "weapon_model": {
+            "type": "composite",
+            "parts": [
+                {"type": "prism", "size": Vector3(0.9, 0.26, 0.3)},
+                {"type": "cylinder", "height": 0.28, "top_radius": 0.1, "bottom_radius": 0.1, "segments": 14, "origin": Vector3(0.08, 0.08, 0.24), "rotation_degrees": Vector3(90, 0, 0)},
+                {"type": "box", "size": Vector3(0.22, 0.12, 0.22), "origin": Vector3(-0.18, -0.08, -0.02)},
+                {"type": "capsule", "radius": 0.08, "height": 0.38, "segments": 14, "origin": Vector3(0.22, 0.02, -0.04), "rotation_degrees": Vector3(0, 90, 0)}
+            ],
+            "offset": Vector3(0.04, -0.02, -0.22),
+            "scale": 0.46
         },
         "projectile_mesh": {
             "type": "composite",
@@ -81,6 +102,17 @@ const WEAPONS = [
                 {"type": "prism", "size": Vector3(0.4, 0.22, 0.34), "origin": Vector3(0, -0.12, -0.08), "rotation_degrees": Vector3(-14, 0, 0)}
             ]
         },
+        "weapon_model": {
+            "type": "composite",
+            "parts": [
+                {"type": "box", "size": Vector3(0.82, 0.22, 0.32)},
+                {"type": "cylinder", "height": 0.72, "top_radius": 0.1, "bottom_radius": 0.12, "segments": 18, "origin": Vector3(0.16, 0.04, 0.18), "rotation_degrees": Vector3(90, 0, 0)},
+                {"type": "cylinder", "height": 0.72, "top_radius": 0.1, "bottom_radius": 0.12, "segments": 18, "origin": Vector3(-0.16, 0.04, 0.18), "rotation_degrees": Vector3(90, 0, 0)},
+                {"type": "prism", "size": Vector3(0.32, 0.18, 0.26), "origin": Vector3(0, -0.1, -0.06), "rotation_degrees": Vector3(-12, 0, 0)}
+            ],
+            "offset": Vector3(0.02, -0.06, -0.32),
+            "scale": 0.5
+        },
         "projectile_mesh": {
             "type": "composite",
             "parts": [
@@ -112,6 +144,17 @@ const WEAPONS = [
                 {"type": "box", "size": Vector3(0.42, 0.08, 0.4), "origin": Vector3(0, 0.1, -0.12)}
             ]
         },
+        "weapon_model": {
+            "type": "composite",
+            "parts": [
+                {"type": "cylinder", "height": 0.98, "top_radius": 0.18, "bottom_radius": 0.26, "segments": 22},
+                {"type": "cone", "height": 0.28, "top_radius": 0.04, "bottom_radius": 0.18, "segments": 18, "origin": Vector3(0, 0.46, 0)},
+                {"type": "box", "size": Vector3(0.3, 0.09, 0.48), "origin": Vector3(0, -0.28, 0.06)},
+                {"type": "box", "size": Vector3(0.38, 0.08, 0.32), "origin": Vector3(0, 0.06, -0.12)}
+            ],
+            "offset": Vector3(0.02, -0.08, -0.42),
+            "scale": 0.48
+        },
         "projectile_mesh": {
             "type": "composite",
             "parts": [
@@ -141,6 +184,17 @@ const WEAPONS = [
                 {"type": "cylinder", "height": 0.45, "top_radius": 0.08, "bottom_radius": 0.08, "segments": 18, "origin": Vector3(0, 0.2, 0), "rotation_degrees": Vector3(90, 0, 0)},
                 {"type": "capsule", "radius": 0.1, "height": 0.34, "segments": 14, "origin": Vector3(0, -0.18, 0)}
             ]
+        },
+        "weapon_model": {
+            "type": "composite",
+            "parts": [
+                {"type": "cylinder", "height": 0.86, "top_radius": 0.08, "bottom_radius": 0.08, "segments": 18},
+                {"type": "torus", "inner_radius": 0.08, "outer_radius": 0.18, "ring_segments": 22, "rings": 14, "origin": Vector3(0, 0.24, 0)},
+                {"type": "torus", "inner_radius": 0.06, "outer_radius": 0.14, "ring_segments": 18, "rings": 12, "origin": Vector3(0, -0.18, 0)},
+                {"type": "capsule", "radius": 0.1, "height": 0.24, "segments": 14, "origin": Vector3(0, -0.34, -0.02)}
+            ],
+            "offset": Vector3(0.0, -0.02, -0.24),
+            "scale": 0.52
         },
         "projectile_mesh": {
             "type": "composite",

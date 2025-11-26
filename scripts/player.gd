@@ -32,6 +32,7 @@ var health := 100.0
 var bob_time := 0.0
 var damage_shake_time := 0.0
 var weapon_rest_position := Vector3.ZERO
+var weapon_base_scale := Vector3.ONE
 var weapon_fire_tween: Tween
 var is_dead := false
 var wants_recap_mouse := true
@@ -39,6 +40,10 @@ var force_move_input := Vector2.ZERO
 var slide_time := 0.0
 var slide_direction := Vector3.ZERO
 var coyote_timer := 0.0
+var jump_buffer_time := 0.0
+var jumps_used := 0
+
+const MAX_JUMPS := 2
 
 @onready var head: Node3D = $Head
 @onready var camera: Camera3D = $Head/Camera3D
@@ -56,12 +61,15 @@ func _ready():
     explosion_scene = explosion_scene if explosion_scene else DEFAULT_EXPLOSION_SCENE
     floor_snap_length = max(floor_snap_length, step_height)
     Input.set_mouse_mode(Input.MOUSE_MODE_CAPTURED)
+    weapon_base_scale = weapon_mesh.scale
     weapon_rest_position = weapon_mesh.position
+    _apply_weapon_model()
     update_hud()
 
 func set_weapons(list: Array):
     weapons = list.duplicate()
     current_weapon_index = 0
+    _apply_weapon_model()
     update_hud()
 
 func _input(event):
@@ -89,9 +97,8 @@ func _unhandled_input(event):
     if event.is_action_pressed("fire"):
         recapture_mouse()
         shoot()
-    if event.is_action_pressed("jump") and (is_on_floor() or coyote_timer > 0.0):
-        velocity.y = jump_velocity
-        coyote_timer = 0.0
+    if event.is_action_pressed("jump"):
+        jump_buffer_time = 0.18
         recapture_mouse()
 
 func _notification(what):
@@ -109,9 +116,16 @@ func _physics_process(delta):
         coyote_timer = max(0.0, coyote_timer - delta)
     else:
         coyote_timer = coyote_time
-    if Input.is_action_just_pressed("jump") and (is_on_floor() or coyote_timer > 0.0):
+        jumps_used = 0
+    if Input.is_action_just_pressed("jump"):
+        jump_buffer_time = 0.18
+    jump_buffer_time = max(0.0, jump_buffer_time - delta)
+
+    if jump_buffer_time > 0.0 and (is_on_floor() or coyote_timer > 0.0 or jumps_used < MAX_JUMPS - 1):
         velocity.y = jump_velocity
         coyote_timer = 0.0
+        jumps_used += 1
+        jump_buffer_time = 0.0
     var input_dir = Input.get_vector("move_left", "move_right", "move_forward", "move_backward")
     if input_dir == Vector2.ZERO and force_move_input != Vector2.ZERO:
         input_dir = force_move_input.normalized()
@@ -131,12 +145,6 @@ func _physics_process(delta):
             target_speed *= crouch_multiplier
         velocity.x = direction.x * target_speed
         velocity.z = direction.z * target_speed
-    if Input.is_action_just_pressed("jump") and is_on_floor():
-        velocity.y = jump_velocity
-        coyote_timer = 0.0
-    elif Input.is_action_just_pressed("jump") and coyote_timer > 0.0:
-        velocity.y = jump_velocity
-        coyote_timer = 0.0
     apply_step_assist(direction)
     move_and_slide()
     apply_crouch(delta, is_crouching)
@@ -184,6 +192,7 @@ func switch_weapon(step: int):
     if weapons.is_empty():
         return
     current_weapon_index = wrapi(current_weapon_index + step, 0, weapons.size())
+    _apply_weapon_model()
     update_hud()
 
 func shoot():
@@ -228,6 +237,7 @@ func pickup_weapon(weapon_id: String):
     for i in weapons.size():
         if weapons[i].get("id", "") == weapon_id:
             current_weapon_index = i
+            _apply_weapon_model()
             update_hud()
             return
     update_hud()
@@ -334,6 +344,99 @@ func animate_weapon_fire(data: Dictionary):
             weapon_fire_tween.parallel().tween_property(weapon_mesh, "rotation_degrees:x", -6.0, 0.06)
     weapon_fire_tween.tween_property(weapon_mesh, "position", weapon_rest_position, 0.12).set_trans(Tween.TRANS_SINE)
     weapon_fire_tween.parallel().tween_property(weapon_mesh, "rotation_degrees", Vector3.ZERO, 0.12).set_trans(Tween.TRANS_SINE)
+
+func _apply_weapon_model():
+    if not weapon_mesh:
+        return
+    for child in weapon_mesh.get_children():
+        child.queue_free()
+    if weapons.is_empty():
+        return
+    var data: Dictionary = weapons[current_weapon_index]
+    var model_data: Dictionary = data.get("weapon_model", {})
+    var mesh := _build_mesh(model_data)
+    if mesh:
+        var instance := MeshInstance3D.new()
+        instance.mesh = mesh
+        var mat := StandardMaterial3D.new()
+        var tint: Color = data.get("pickup_color", Color(0.9, 0.9, 0.9))
+        mat.albedo_color = tint
+        mat.emission_enabled = true
+        mat.emission = tint * 0.4
+        mat.roughness = 0.35
+        instance.material_override = mat
+        weapon_mesh.add_child(instance)
+    var offset: Vector3 = model_data.get("offset", Vector3.ZERO)
+    weapon_mesh.position = Vector3(0.24, -0.25, -0.7) + offset
+    var scale_mult: float = model_data.get("scale", 0.6)
+    weapon_mesh.scale = weapon_base_scale * scale_mult
+    weapon_rest_position = weapon_mesh.position
+
+func _build_mesh(data: Dictionary) -> Mesh:
+    if data.has("type") and data.get("type") == "composite":
+        return _compose_mesh(data.get("parts", []))
+    return _build_primitive_mesh(data)
+
+func _build_primitive_mesh(data: Dictionary) -> Mesh:
+    match data.get("type"):
+        "box":
+            var box := BoxMesh.new()
+            box.size = data.get("size", Vector3(0.38, 0.24, 0.52))
+            return box
+        "prism":
+            var prism := PrismMesh.new()
+            prism.size = data.get("size", Vector3(0.9, 0.3, 0.3))
+            return prism
+        "cylinder":
+            var cylinder := CylinderMesh.new()
+            cylinder.height = data.get("height", 0.8)
+            cylinder.top_radius = data.get("top_radius", 0.2)
+            cylinder.bottom_radius = data.get("bottom_radius", 0.24)
+            cylinder.radial_segments = data.get("segments", 18)
+            return cylinder
+        "capsule":
+            var capsule := CapsuleMesh.new()
+            capsule.radius = data.get("radius", 0.2)
+            capsule.height = data.get("height", 0.8)
+            capsule.radial_segments = data.get("segments", 12)
+            return capsule
+        "cone":
+            var cone := CylinderMesh.new()
+            cone.height = data.get("height", 0.82)
+            cone.top_radius = data.get("top_radius", 0.08)
+            cone.bottom_radius = data.get("bottom_radius", 0.3)
+            cone.radial_segments = data.get("segments", 18)
+            return cone
+        "torus":
+            var torus := TorusMesh.new()
+            torus.inner_radius = data.get("inner_radius", 0.12)
+            torus.outer_radius = data.get("outer_radius", 0.32)
+            torus.ring_segments = data.get("ring_segments", 18)
+            torus.rings = data.get("rings", 12)
+            return torus
+        _:
+            return null
+
+func _compose_mesh(parts: Array) -> Mesh:
+    if parts.is_empty():
+        return null
+    var tool := SurfaceTool.new()
+    tool.begin(Mesh.PRIMITIVE_TRIANGLES)
+    for part in parts:
+        var piece := _build_primitive_mesh(part)
+        if piece:
+            var part_transform := _part_transform(part)
+            for surface in range(piece.get_surface_count()):
+                tool.append_from(piece, surface, part_transform)
+    return tool.commit()
+
+func _part_transform(part: Dictionary) -> Transform3D:
+    var origin: Vector3 = part.get("origin", Vector3.ZERO)
+    var rotation_deg: Vector3 = part.get("rotation_degrees", Vector3.ZERO)
+    var scale_vec: Vector3 = part.get("scale", Vector3.ONE)
+    var part_basis := Basis.from_euler(rotation_deg * (PI / 180.0))
+    part_basis = part_basis.scaled(scale_vec)
+    return Transform3D(part_basis, origin)
 
 func start_slide(direction: Vector3):
     slide_direction = direction.normalized()
