@@ -10,7 +10,7 @@ var explosion_scene: PackedScene
 var creator: Node
 
 @onready var mesh_instance: MeshInstance3D = $MeshInstance3D
-@onready var trail: CPUParticles3D = $Trail
+@onready var trail: GPUParticles3D = $Trail
 
 func _ready():
     body_entered.connect(_on_body_entered)

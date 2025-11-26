@@ -21,7 +21,7 @@ material_override = ExtResource( 2 )
 [node name="CollisionShape3D" type="CollisionShape3D" parent="."]
 shape = SubResource( 2 )
 
-[node name="Trail" type="CPUParticles3D" parent="."]
+[node name="Trail" type="GPUParticles3D" parent="."]
 emitting = true
 amount = 64
 lifetime = 0.3
