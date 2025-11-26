@@ -80,16 +80,105 @@ func clear_game():
         player.queue_free()
 
 func generate_level():
+    var heights := _build_height_map()
     for x in range(grid_size.x):
         for y in range(grid_size.y):
             var tile = tile_scene.instantiate()
-            var height_offset = height_noise.get_noise_2d(x, y) * tile_height_variation
+            var height_offset = heights[x][y]
             tile.position = Vector3(x * tile_size, height_offset, y * tile_size)
             tile.rotation_degrees.y = rng.randf_range(-1.2, 1.2)
+            _tint_tile(tile, height_offset, x, y)
             level_root.add_child(tile)
             floor_positions.append(tile.global_transform.origin + Vector3(0, 0.55, 0))
             _maybe_add_cover(tile)
             _maybe_add_vertical_feature(tile)
+            _decorate_tile(tile, height_offset, x, y)
+
+func _build_height_map() -> Array:
+    var heights: Array = []
+    for x in range(grid_size.x):
+        heights.append([])
+        for y in range(grid_size.y):
+            var primary = height_noise.get_noise_2d(x, y) * tile_height_variation * 0.75
+            var ridges = height_noise.get_noise_2d(x * 0.35, y * 0.35) * tile_height_variation * 0.4
+            var waves = sin(x * 0.32) * 0.12 + cos(y * 0.28) * 0.1
+            heights[x].append(primary + ridges + waves)
+    for i in range(2):
+        var smoothed: Array = []
+        for x in range(grid_size.x):
+            smoothed.append([])
+            for y in range(grid_size.y):
+                var acc: float = float(heights[x][y]) * 3.0
+                var count: float = 3.0
+                for ox in range(-1, 2):
+                    for oy in range(-1, 2):
+                        var nx = x + ox
+                        var ny = y + oy
+                        if nx < 0 or ny < 0 or nx >= grid_size.x or ny >= grid_size.y or (ox == 0 and oy == 0):
+                            continue
+                        acc += heights[nx][ny]
+                        count += 1.0
+                smoothed[x].append(acc / count)
+        heights = smoothed
+    return heights
+
+func _tint_tile(tile: Node, height_offset: float, x: int, y: int):
+    var mesh_instance: MeshInstance3D = tile.get_node_or_null("MeshInstance3D")
+    if mesh_instance:
+        mesh_instance.material_override = _make_tile_material(height_offset, x, y)
+
+func _make_tile_material(height_offset: float, x: int, y: int) -> StandardMaterial3D:
+    var mat := StandardMaterial3D.new()
+    var height_factor: float = clamp((height_offset / max(0.01, tile_height_variation)) * 0.5 + 0.5, 0.0, 1.0)
+    var base = Color(0.14, 0.18, 0.2)
+    var mid = Color(0.18, 0.26, 0.32)
+    var high = Color(0.26, 0.34, 0.42)
+    var tint = base.lerp(mid, height_factor).lerp(high, abs(sin((x + y) * 0.23)) * 0.6)
+    mat.albedo_color = tint
+    mat.metallic = 0.08
+    mat.roughness = 0.55
+    mat.emission_enabled = true
+    mat.emission = tint * 0.08
+    return mat
+
+func _decorate_tile(tile: Node3D, height_offset: float, x: int, y: int):
+    var roll = rng.randf()
+    if roll < 0.12:
+        var light := OmniLight3D.new()
+        light.light_color = Color(0.4 + rng.randf() * 0.2, 0.6 + rng.randf() * 0.3, 0.9)
+        light.light_energy = 0.8
+        light.range = 10.0
+        light.position = Vector3(rng.randf_range(-tile_size * 0.28, tile_size * 0.28), 0.6 + height_offset * 0.2, rng.randf_range(-tile_size * 0.28, tile_size * 0.28))
+        tile.add_child(light)
+    elif roll < 0.26:
+        var strut := MeshInstance3D.new()
+        var mesh := PrismMesh.new()
+        mesh.size = Vector3(0.6, 0.4, 1.4)
+        strut.mesh = mesh
+        var mat := StandardMaterial3D.new()
+        mat.albedo_color = Color(0.18, 0.22, 0.28)
+        mat.roughness = 0.4
+        mat.metallic = 0.2
+        strut.material_override = mat
+        strut.position = Vector3(rng.randf_range(-tile_size * 0.3, tile_size * 0.3), 0.25, rng.randf_range(-tile_size * 0.3, tile_size * 0.3))
+        strut.rotation_degrees = Vector3(0, rng.randf_range(0, 180), rng.randf_range(-8, 8))
+        tile.add_child(strut)
+    elif roll < 0.42:
+        var ribs := MeshInstance3D.new()
+        var rib_mesh := TorusMesh.new()
+        rib_mesh.inner_radius = 0.32
+        rib_mesh.outer_radius = 0.62
+        rib_mesh.ring_segments = 18
+        rib_mesh.rings = 12
+        ribs.mesh = rib_mesh
+        var rib_mat := StandardMaterial3D.new()
+        rib_mat.albedo_color = Color(0.12, 0.16, 0.2)
+        rib_mat.emission_enabled = true
+        rib_mat.emission = Color(0.12, 0.34, 0.46) * 0.12
+        ribs.material_override = rib_mat
+        ribs.position = Vector3(0, 0.02, 0)
+        ribs.rotation_degrees = Vector3(90, rng.randf_range(0, 360), 0)
+        tile.add_child(ribs)
 
 func _maybe_add_cover(tile: Node3D):
     if rng.randf() > cover_chance:

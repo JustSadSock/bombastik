@@ -45,6 +45,10 @@ var slide_direction := Vector3.ZERO
 var coyote_timer := 0.0
 var jump_buffer_time := 0.0
 var jumps_used := 0
+var was_on_floor := false
+var was_sliding := false
+
+var lean_tween: Tween
 
 var sound_assets_generated := false
 
@@ -57,6 +61,10 @@ const MAX_JUMPS := 2
 @onready var fire_audio: AudioStreamPlayer3D = $Head/FireAudio
 @onready var hurt_audio: AudioStreamPlayer3D = $Head/HurtAudio
 @onready var step_audio: AudioStreamPlayer3D = $Head/StepAudio
+@onready var jump_audio: AudioStreamPlayer3D = $Head/JumpAudio
+@onready var land_audio: AudioStreamPlayer3D = $Head/LandAudio
+@onready var slide_audio: AudioStreamPlayer3D = $Head/SlideAudio
+@onready var swap_audio: AudioStreamPlayer3D = $Head/SwapAudio
 @onready var collision_shape: CollisionShape3D = $CollisionShape3D
 
 func _ready():
@@ -71,6 +79,7 @@ func _ready():
     _ensure_sounds()
     _apply_weapon_model()
     update_hud()
+    was_on_floor = is_on_floor()
 
 func set_weapons(list: Array):
     weapons = list.duplicate()
@@ -117,6 +126,8 @@ func _notification(what):
 func _physics_process(delta):
     if is_dead:
         return
+    var was_grounded = is_on_floor()
+    var sliding_before = slide_time > 0.0
     if not is_on_floor():
         velocity.y -= gravity * delta
         coyote_timer = max(0.0, coyote_timer - delta)
@@ -132,6 +143,8 @@ func _physics_process(delta):
         coyote_timer = 0.0
         jumps_used += 1
         jump_buffer_time = 0.0
+        _play_sound(jump_audio, 520.0 + 60.0 * jumps_used, 0.16, 0.55)
+        _animate_air_push()
     var input_dir = Input.get_vector("move_left", "move_right", "move_forward", "move_backward")
     if input_dir == Vector2.ZERO and force_move_input != Vector2.ZERO:
         input_dir = force_move_input.normalized()
@@ -160,6 +173,13 @@ func _physics_process(delta):
     move_and_slide()
     apply_crouch(delta, is_crouching)
     apply_headbob(delta, direction)
+    if not was_grounded and is_on_floor():
+        _play_sound(land_audio, 240.0, 0.18, 0.48)
+        _animate_land()
+    if not sliding_before and slide_time > 0.0:
+        _play_sound(slide_audio, 180.0, 0.24, 0.44)
+    was_on_floor = is_on_floor()
+    was_sliding = slide_time > 0.0
 
 func _process(delta):
     if is_dead:
@@ -204,6 +224,8 @@ func switch_weapon(step: int):
         return
     current_weapon_index = wrapi(current_weapon_index + step, 0, weapons.size())
     _apply_weapon_model()
+    _animate_weapon_swap()
+    _play_sound(swap_audio, 360.0, 0.16, 0.4)
     update_hud()
 
 func shoot():
@@ -221,7 +243,13 @@ func shoot():
         dir = (dir + Vector3(rng.randf_range(-spread, spread), rng.randf_range(-spread, spread), rng.randf_range(-spread, spread))).normalized()
         spawn_projectile(dir, data)
     if fire_audio:
-        _play_sound(fire_audio, 520.0, 0.12, 0.65)
+        var fire_profile: Dictionary = data.get("fire_sound", {})
+        _play_sound(
+            fire_audio,
+            fire_profile.get("freq", 520.0),
+            fire_profile.get("duration", 0.12),
+            fire_profile.get("amplitude", 0.65)
+        )
     apply_recoil()
     animate_weapon_fire(data)
     update_hud()
@@ -356,6 +384,37 @@ func animate_weapon_fire(data: Dictionary):
     weapon_fire_tween.tween_property(weapon_mesh, "position", weapon_rest_position, 0.12).set_trans(Tween.TRANS_SINE)
     weapon_fire_tween.parallel().tween_property(weapon_mesh, "rotation_degrees", Vector3.ZERO, 0.12).set_trans(Tween.TRANS_SINE)
 
+func _animate_weapon_swap():
+    if not weapon_mesh:
+        return
+    if lean_tween:
+        lean_tween.kill()
+    lean_tween = create_tween()
+    lean_tween.tween_property(weapon_mesh, "rotation_degrees:y", 20.0, 0.08).set_trans(Tween.TRANS_SINE)
+    lean_tween.parallel().tween_property(weapon_mesh, "position:x", weapon_rest_position.x + 0.06, 0.08)
+    lean_tween.tween_property(weapon_mesh, "rotation_degrees:y", 0.0, 0.12).set_trans(Tween.TRANS_SINE)
+    lean_tween.parallel().tween_property(weapon_mesh, "position:x", weapon_rest_position.x, 0.12)
+
+func _animate_air_push():
+    if not weapon_mesh:
+        return
+    if lean_tween:
+        lean_tween.kill()
+    lean_tween = create_tween()
+    lean_tween.tween_property(weapon_mesh, "rotation_degrees:x", -12.0, 0.12).set_trans(Tween.TRANS_SINE)
+    lean_tween.tween_property(weapon_mesh, "rotation_degrees:x", 0.0, 0.16).set_trans(Tween.TRANS_SINE)
+
+func _animate_land():
+    if not weapon_mesh:
+        return
+    if lean_tween:
+        lean_tween.kill()
+    lean_tween = create_tween()
+    lean_tween.tween_property(weapon_mesh, "rotation_degrees:x", 6.0, 0.08).set_trans(Tween.TRANS_SINE)
+    lean_tween.parallel().tween_property(camera, "position:y", -0.05, 0.08)
+    lean_tween.tween_property(weapon_mesh, "rotation_degrees:x", 0.0, 0.1)
+    lean_tween.parallel().tween_property(camera, "position", Vector3.ZERO, 0.1)
+
 func _apply_weapon_model():
     if not weapon_mesh:
         return
@@ -473,6 +532,14 @@ func _ensure_sounds():
         hurt_audio.stream = _build_tone(200.0, 0.2, 0.55)
     if step_audio:
         step_audio.stream = _build_tone(140.0, 0.08, 0.4)
+    if jump_audio:
+        jump_audio.stream = _build_tone(440.0, 0.18, 0.48)
+    if land_audio:
+        land_audio.stream = _build_tone(260.0, 0.2, 0.5)
+    if slide_audio:
+        slide_audio.stream = _build_tone(190.0, 0.22, 0.42)
+    if swap_audio:
+        swap_audio.stream = _build_tone(360.0, 0.16, 0.4)
     sound_assets_generated = true
 
 func _play_sound(player: AudioStreamPlayer3D, freq: float, duration: float, amplitude: float):
@@ -480,10 +547,14 @@ func _play_sound(player: AudioStreamPlayer3D, freq: float, duration: float, ampl
         return
     if not player.stream:
         player.stream = _build_tone(freq, duration, amplitude)
+    if not player.playing:
+        player.play()
     var playback = player.get_stream_playback()
     if playback is AudioStreamGeneratorPlayback:
         _fill_generator(playback, freq, duration, amplitude)
-    player.play()
+    else:
+        player.stop()
+        player.play()
 
 func _build_tone(freq: float, duration: float, amplitude: float) -> AudioStream:
     var sample := AudioStreamWAV.new()
