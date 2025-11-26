@@ -130,55 +130,71 @@ func _tint_tile(tile: Node, height_offset: float, x: int, y: int):
 func _make_tile_material(height_offset: float, x: int, y: int) -> StandardMaterial3D:
     var mat := StandardMaterial3D.new()
     var height_factor: float = clamp((height_offset / max(0.01, tile_height_variation)) * 0.5 + 0.5, 0.0, 1.0)
-    var base = Color(0.14, 0.18, 0.2)
-    var mid = Color(0.18, 0.26, 0.32)
-    var high = Color(0.26, 0.34, 0.42)
-    var tint = base.lerp(mid, height_factor).lerp(high, abs(sin((x + y) * 0.23)) * 0.6)
+    var base = Color(0.07, 0.1, 0.14)
+    var mid = Color(0.12, 0.18, 0.24)
+    var high = Color(0.24, 0.36, 0.46)
+    var accent = Color(0.22, 0.58, 0.92)
+    var tint = base.lerp(mid, height_factor).lerp(high, abs(sin((x + y) * 0.23)) * 0.65)
     mat.albedo_color = tint
-    mat.metallic = 0.08
-    mat.roughness = 0.55
+    mat.metallic = 0.12
+    mat.roughness = 0.48
+    mat.clearcoat = 0.08
     mat.emission_enabled = true
-    mat.emission = tint * 0.08
+    mat.emission = tint * 0.06 + accent * 0.02
     return mat
 
 func _decorate_tile(tile: Node3D, height_offset: float, x: int, y: int):
     var roll = rng.randf()
-    if roll < 0.12:
+    if roll < 0.14:
         var light := OmniLight3D.new()
-        light.light_color = Color(0.4 + rng.randf() * 0.2, 0.6 + rng.randf() * 0.3, 0.9)
-        light.light_energy = 0.8
-        light.omni_range = 10.0
-        light.position = Vector3(rng.randf_range(-tile_size * 0.28, tile_size * 0.28), 0.6 + height_offset * 0.2, rng.randf_range(-tile_size * 0.28, tile_size * 0.28))
+        light.light_color = Color(0.25, 0.6 + rng.randf() * 0.2, 1.0)
+        light.light_energy = 1.1
+        light.omni_range = 12.0
+        light.shadow_enabled = true
+        light.position = Vector3(rng.randf_range(-tile_size * 0.28, tile_size * 0.28), 0.9 + height_offset * 0.2, rng.randf_range(-tile_size * 0.28, tile_size * 0.28))
         tile.add_child(light)
-    elif roll < 0.26:
-        var strut := MeshInstance3D.new()
-        var mesh := PrismMesh.new()
-        mesh.size = Vector3(0.6, 0.4, 1.4)
-        strut.mesh = mesh
-        var mat := StandardMaterial3D.new()
-        mat.albedo_color = Color(0.18, 0.22, 0.28)
-        mat.roughness = 0.4
-        mat.metallic = 0.2
-        strut.material_override = mat
-        strut.position = Vector3(rng.randf_range(-tile_size * 0.3, tile_size * 0.3), 0.25, rng.randf_range(-tile_size * 0.3, tile_size * 0.3))
-        strut.rotation_degrees = Vector3(0, rng.randf_range(0, 180), rng.randf_range(-8, 8))
-        tile.add_child(strut)
-    elif roll < 0.42:
-        var ribs := MeshInstance3D.new()
-        var rib_mesh := TorusMesh.new()
-        rib_mesh.inner_radius = 0.32
-        rib_mesh.outer_radius = 0.62
-        rib_mesh.ring_segments = 18
-        rib_mesh.rings = 12
-        ribs.mesh = rib_mesh
-        var rib_mat := StandardMaterial3D.new()
-        rib_mat.albedo_color = Color(0.12, 0.16, 0.2)
-        rib_mat.emission_enabled = true
-        rib_mat.emission = Color(0.12, 0.34, 0.46) * 0.12
-        ribs.material_override = rib_mat
-        ribs.position = Vector3(0, 0.02, 0)
-        ribs.rotation_degrees = Vector3(90, rng.randf_range(0, 360), 0)
-        tile.add_child(ribs)
+    elif roll < 0.3:
+        var console := MeshInstance3D.new()
+        var console_mesh := BoxMesh.new()
+        console_mesh.size = Vector3(0.8, 0.7, 0.5)
+        console.mesh = console_mesh
+        var console_mat := StandardMaterial3D.new()
+        console_mat.albedo_color = Color(0.14, 0.18, 0.22)
+        console_mat.metallic = 0.26
+        console_mat.roughness = 0.32
+        console_mat.emission_enabled = true
+        console_mat.emission = Color(0.2, 0.65, 0.9) * 0.4
+        console.material_override = console_mat
+        console.position = Vector3(rng.randf_range(-tile_size * 0.26, tile_size * 0.26), 0.35, rng.randf_range(-tile_size * 0.26, tile_size * 0.26))
+        console.rotation_degrees = Vector3(rng.randf_range(-4, 4), rng.randf_range(0, 180), 0)
+        tile.add_child(console)
+    elif roll < 0.46:
+        var pylon := MeshInstance3D.new()
+        var pylon_mesh := CylinderMesh.new()
+        pylon_mesh.height = 2.6
+        pylon_mesh.top_radius = 0.14
+        pylon_mesh.bottom_radius = 0.18
+        pylon.mesh = pylon_mesh
+        var pylon_mat := StandardMaterial3D.new()
+        pylon_mat.albedo_color = Color(0.1, 0.12, 0.16)
+        pylon_mat.metallic = 0.3
+        pylon_mat.roughness = 0.38
+        pylon.material_override = pylon_mat
+        pylon.position = Vector3(rng.randf_range(-tile_size * 0.32, tile_size * 0.32), pylon_mesh.height * 0.5, rng.randf_range(-tile_size * 0.32, tile_size * 0.32))
+        tile.add_child(pylon)
+
+        var cap := MeshInstance3D.new()
+        var cap_mesh := SphereMesh.new()
+        cap_mesh.radius = 0.24
+        cap_mesh.height = 0.18
+        cap.mesh = cap_mesh
+        var cap_mat := StandardMaterial3D.new()
+        cap_mat.albedo_color = Color(0.18, 0.6, 0.86)
+        cap_mat.emission_enabled = true
+        cap_mat.emission = Color(0.18, 0.7, 1.0) * 0.6
+        cap.material_override = cap_mat
+        cap.position = pylon.position + Vector3(0, pylon_mesh.height * 0.5 + 0.18, 0)
+        tile.add_child(cap)
 
 func _maybe_add_cover(tile: Node3D):
     if rng.randf() > cover_chance:
@@ -187,13 +203,28 @@ func _maybe_add_cover(tile: Node3D):
     obstacle.name = "Cover"
     var mesh_instance := MeshInstance3D.new()
     var mesh := BoxMesh.new()
-    mesh.size = Vector3(rng.randf_range(1.2, 1.8), rng.randf_range(0.8, 1.6), rng.randf_range(1.2, 1.8))
+    mesh.size = Vector3(rng.randf_range(1.3, 1.9), rng.randf_range(0.9, 1.8), rng.randf_range(1.3, 1.9))
     mesh_instance.mesh = mesh
     var mat := StandardMaterial3D.new()
-    mat.albedo_color = Color(0.28, 0.34, 0.4)
-    mat.roughness = 0.6
+    mat.albedo_color = Color(0.16, 0.2, 0.25)
+    mat.metallic = 0.18
+    mat.roughness = 0.44
+    mat.emission_enabled = true
+    mat.emission = Color(0.12, 0.38, 0.8) * 0.22
     mesh_instance.material_override = mat
     obstacle.add_child(mesh_instance)
+
+    var accent := MeshInstance3D.new()
+    var accent_mesh := BoxMesh.new()
+    accent_mesh.size = Vector3(mesh.size.x * 0.9, 0.12, mesh.size.z * 0.9)
+    accent.mesh = accent_mesh
+    var accent_mat := StandardMaterial3D.new()
+    accent_mat.albedo_color = Color(0.22, 0.6, 0.86)
+    accent_mat.emission_enabled = true
+    accent_mat.emission = Color(0.3, 0.7, 1.0) * 0.5
+    accent.material_override = accent_mat
+    accent.position = Vector3(0, mesh.size.y * 0.5 + accent_mesh.size.y * 0.5, 0)
+    obstacle.add_child(accent)
 
     var shape := CollisionShape3D.new()
     var box_shape := BoxShape3D.new()
@@ -223,10 +254,23 @@ func _maybe_add_vertical_feature(tile: Node3D):
     mesh.size = Vector3(plateau_size.x, 0.5, plateau_size.y)
     mesh_instance.mesh = mesh
     var mat := StandardMaterial3D.new()
-    mat.albedo_color = Color(0.2, 0.26, 0.32)
-    mat.roughness = 0.55
+    mat.albedo_color = Color(0.14, 0.18, 0.24)
+    mat.roughness = 0.4
+    mat.metallic = 0.24
     mesh_instance.material_override = mat
     platform.add_child(mesh_instance)
+
+    var trim := MeshInstance3D.new()
+    var trim_mesh := BoxMesh.new()
+    trim_mesh.size = Vector3(plateau_size.x * 0.92, 0.16, plateau_size.y * 0.92)
+    trim.mesh = trim_mesh
+    var trim_mat := StandardMaterial3D.new()
+    trim_mat.albedo_color = Color(0.22, 0.58, 0.86)
+    trim_mat.emission_enabled = true
+    trim_mat.emission = Color(0.22, 0.6, 0.92) * 0.6
+    trim.material_override = trim_mat
+    trim.position.y = mesh.size.y * 0.5 + trim_mesh.size.y * 0.5
+    platform.add_child(trim)
 
     var shape := CollisionShape3D.new()
     var box_shape := BoxShape3D.new()
@@ -247,8 +291,9 @@ func _maybe_add_vertical_feature(tile: Node3D):
     ramp_mesh.size = Vector3(plateau_size.x * 0.6, plateau_height, 0.8)
     ramp.mesh = ramp_mesh
     var ramp_mat := StandardMaterial3D.new()
-    ramp_mat.albedo_color = Color(0.24, 0.3, 0.36)
-    ramp_mat.roughness = 0.55
+    ramp_mat.albedo_color = Color(0.18, 0.26, 0.32)
+    ramp_mat.roughness = 0.48
+    ramp_mat.metallic = 0.18
     ramp.material_override = ramp_mat
     ramp.position = Vector3(0, -plateau_height * 0.5, plateau_size.y * 0.5 + 0.6)
     ramp.rotation_degrees.x = -90.0
@@ -269,6 +314,30 @@ func _maybe_add_vertical_feature(tile: Node3D):
         stair_collision.shape = stair_box
         stair_collision.position = stair_mesh.position
         platform.add_child(stair_collision)
+
+    var rail_height := plateau_height * 0.6 + 0.6
+    for side in [-1, 1]:
+        var rail := MeshInstance3D.new()
+        var rail_mesh := CylinderMesh.new()
+        rail_mesh.height = plateau_size.y * 0.9
+        rail_mesh.top_radius = 0.05
+        rail_mesh.bottom_radius = 0.05
+        rail.mesh = rail_mesh
+        var rail_mat := StandardMaterial3D.new()
+        rail_mat.albedo_color = Color(0.12, 0.16, 0.22)
+        rail_mat.metallic = 0.34
+        rail_mat.roughness = 0.36
+        rail.material_override = rail_mat
+        rail.rotation_degrees = Vector3(0, 0, 90)
+        rail.position = Vector3(plateau_size.x * 0.5 * side, rail_height, 0)
+        platform.add_child(rail)
+
+        var rail_light := OmniLight3D.new()
+        rail_light.light_color = Color(0.22, 0.68, 1.0)
+        rail_light.light_energy = 0.6
+        rail_light.omni_range = 10.0
+        rail_light.position = rail.position + Vector3(0, 0.2, 0)
+        platform.add_child(rail_light)
 
     tile.add_child(platform)
     floor_positions.append(platform.global_transform.origin + Vector3(0, 0.55, 0))

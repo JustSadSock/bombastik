@@ -1,4 +1,4 @@
-[gd_scene load_steps=11 format=3]
+[gd_scene load_steps=12 format=3]
 
 [ext_resource type="Script" path="res://scripts/enemy.gd" id="1"]
 [ext_resource type="Material" path="res://materials/enemy_melee_material.tres" id="2"]
@@ -24,6 +24,10 @@ bottom_radius = 0.35
 albedo_color = Color(0.12, 0.14, 0.16, 1)
 metallic = 0.3
 roughness = 0.5
+
+[sub_resource type="SphereMesh" id="6"]
+radius = 0.32
+height = 0.24
 
 [node name="Enemy" type="CharacterBody3D"]
 script = ExtResource( 1 )
@@ -53,6 +57,11 @@ material_override = ExtResource( 2 )
 [node name="Visor" type="MeshInstance3D" parent="Visual"]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.24, -0.36)
 mesh = SubResource( 3 )
+material_override = ExtResource( 3 )
+
+[node name="Core" type="MeshInstance3D" parent="Visual"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.86, -0.24)
+mesh = SubResource( 6 )
 material_override = ExtResource( 3 )
 
 [node name="Joints" type="MeshInstance3D" parent="Visual"]
