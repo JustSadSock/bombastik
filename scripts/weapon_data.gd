@@ -13,6 +13,8 @@ const WEAPONS = [
         "projectile_color": Color(1.0, 0.86, 0.56),
         "pickup_color": Color(1.0, 0.88, 0.54),
         "fire_style": "pistol",
+        "pickup_mesh": {"type": "box", "size": Vector3(0.42, 0.2, 0.48)},
+        "projectile_mesh": {"type": "sphere", "radius": 0.16, "segments": 14, "rings": 12},
     },
     {
         "id": "rifle",
@@ -26,6 +28,8 @@ const WEAPONS = [
         "projectile_color": Color(0.64, 0.92, 1.0),
         "pickup_color": Color(0.58, 0.86, 1.0),
         "fire_style": "burst",
+        "pickup_mesh": {"type": "prism", "size": Vector3(1.08, 0.3, 0.34)},
+        "projectile_mesh": {"type": "capsule", "radius": 0.1, "height": 0.55, "segments": 14},
     },
     {
         "id": "shotgun",
@@ -40,6 +44,8 @@ const WEAPONS = [
         "projectile_color": Color(1.0, 0.7, 0.48),
         "pickup_color": Color(0.95, 0.64, 0.46),
         "fire_style": "kick",
+        "pickup_mesh": {"type": "cylinder", "height": 0.82, "top_radius": 0.24, "bottom_radius": 0.3, "segments": 20},
+        "projectile_mesh": {"type": "box", "size": Vector3(0.24, 0.16, 0.3)},
     },
     {
         "id": "rocket",
@@ -54,6 +60,8 @@ const WEAPONS = [
         "projectile_color": Color(1.0, 0.46, 0.34),
         "pickup_color": Color(1.0, 0.54, 0.32),
         "fire_style": "heavy",
+        "pickup_mesh": {"type": "cone", "height": 1.0, "top_radius": 0.08, "bottom_radius": 0.32, "segments": 22},
+        "projectile_mesh": {"type": "cone", "height": 0.7, "top_radius": 0.05, "bottom_radius": 0.22, "segments": 20},
     },
     {
         "id": "laser",
@@ -67,5 +75,7 @@ const WEAPONS = [
         "projectile_color": Color(0.64, 1.0, 0.7),
         "pickup_color": Color(0.5, 1.0, 0.72),
         "fire_style": "beam",
+        "pickup_mesh": {"type": "torus", "inner_radius": 0.12, "outer_radius": 0.34, "ring_segments": 22, "radial_segments": 14},
+        "projectile_mesh": {"type": "cylinder", "height": 0.9, "top_radius": 0.08, "bottom_radius": 0.08, "segments": 18},
     }
 ]

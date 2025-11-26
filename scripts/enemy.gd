@@ -270,7 +270,7 @@ func _apply_variant_style():
     _tint_mesh(head_mesh, style.get("body", Color.WHITE))
     for mesh in accent_meshes:
         if mesh:
-            _tint_mesh(mesh, style.get("accent", mesh.modulate))
+            _tint_mesh(mesh, style.get("accent", _get_mesh_color(mesh)))
     if glow:
         glow.color = style.get("light", glow.color)
         glow.light_energy = 1.0 + rng.randf_range(-0.1, 0.3)
@@ -279,14 +279,26 @@ func _apply_variant_style():
 func _tint_mesh(mesh: MeshInstance3D, color: Color):
     if not mesh:
         return
-    mesh.modulate = color
-    if mesh.material_override:
-        var mat := mesh.material_override.duplicate()
-        if mat is BaseMaterial3D:
-            mat.albedo_color = color
-            mat.emission_enabled = true
-            mat.emission = color * 0.35
-        mesh.material_override = mat
+    var mat: BaseMaterial3D
+    if mesh.material_override and mesh.material_override is BaseMaterial3D:
+        mat = mesh.material_override.duplicate()
+    else:
+        mat = StandardMaterial3D.new()
+    mat.albedo_color = color
+    mat.emission_enabled = true
+    mat.emission = color * 0.35
+    mesh.material_override = mat
+
+func _get_mesh_color(mesh: MeshInstance3D) -> Color:
+    if not mesh:
+        return Color.WHITE
+    if mesh.material_override and mesh.material_override is BaseMaterial3D:
+        return mesh.material_override.albedo_color
+    if mesh.mesh:
+        var surface_mat := mesh.mesh.surface_get_material(0)
+        if surface_mat is BaseMaterial3D:
+            return surface_mat.albedo_color
+    return Color.WHITE
 
 func _spawn_attachments(attachments: Array, accent: Color):
     for data in attachments:

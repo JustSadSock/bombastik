@@ -218,6 +218,7 @@ func spawn_projectile(direction: Vector3, weapon_data: Dictionary):
     projectile.set("explosion_scene", explosion_scene)
     projectile.set("creator", self)
     projectile.set("tint", weapon_data.get("projectile_color", Color(1.0, 0.9, 0.7)))
+    projectile.set("shape_data", weapon_data.get("projectile_mesh", {}))
     projectile.scale = Vector3.ONE * weapon_data.get("projectile_scale", 0.2)
     get_tree().current_scene.add_child(projectile)
 

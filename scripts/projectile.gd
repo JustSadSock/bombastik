@@ -5,6 +5,7 @@ extends Area3D
 @export var explosive: bool = false
 @export var lifespan: float = 4.0
 @export var tint: Color = Color(1.0, 0.9, 0.7)
+@export var shape_data: Dictionary = {}
 var explosion_scene: PackedScene
 var creator: Node
 
@@ -13,6 +14,7 @@ var creator: Node
 
 func _ready():
     body_entered.connect(_on_body_entered)
+    _apply_shape()
     _apply_tint()
     monitoring = true
 
@@ -38,13 +40,58 @@ func explode():
 
 func _apply_tint():
     if mesh_instance:
-        mesh_instance.modulate = tint
-        if mesh_instance.material_override:
-            var mat := mesh_instance.material_override.duplicate()
-            if mat is BaseMaterial3D:
-                mat.albedo_color = tint
-                mat.emission_enabled = true
-                mat.emission = tint * 0.55
-            mesh_instance.material_override = mat
+        var mat: BaseMaterial3D
+        if mesh_instance.material_override and mesh_instance.material_override is BaseMaterial3D:
+            mat = mesh_instance.material_override.duplicate()
+        else:
+            mat = StandardMaterial3D.new()
+        mat.albedo_color = tint
+        mat.emission_enabled = true
+        mat.emission = tint * 0.55
+        mesh_instance.material_override = mat
     if trail:
         trail.modulate = tint
+
+func _apply_shape():
+    if not mesh_instance:
+        return
+    var mesh := _build_mesh(shape_data)
+    if mesh:
+        mesh_instance.mesh = mesh
+
+func _build_mesh(data: Dictionary) -> Mesh:
+    if not data.has("type"):
+        return null
+    match data.get("type"):
+        "box":
+            var box := BoxMesh.new()
+            box.size = data.get("size", Vector3.ONE * 0.25)
+            return box
+        "capsule":
+            var capsule := CapsuleMesh.new()
+            capsule.radius = data.get("radius", 0.12)
+            capsule.height = data.get("height", 0.6)
+            capsule.radial_segments = data.get("segments", 12)
+            return capsule
+        "cylinder":
+            var cylinder := CylinderMesh.new()
+            cylinder.height = data.get("height", 0.6)
+            cylinder.top_radius = data.get("top_radius", 0.12)
+            cylinder.bottom_radius = data.get("bottom_radius", 0.12)
+            cylinder.radial_segments = data.get("segments", 12)
+            return cylinder
+        "sphere":
+            var sphere := SphereMesh.new()
+            sphere.radius = data.get("radius", 0.18)
+            sphere.radial_segments = data.get("segments", 10)
+            sphere.rings = data.get("rings", 8)
+            return sphere
+        "cone":
+            var cone := CylinderMesh.new()
+            cone.height = data.get("height", 0.72)
+            cone.top_radius = data.get("top_radius", 0.02)
+            cone.bottom_radius = data.get("bottom_radius", 0.2)
+            cone.radial_segments = data.get("segments", 16)
+            return cone
+        _:
+            return null
