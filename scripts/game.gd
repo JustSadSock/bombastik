@@ -147,7 +147,7 @@ func _decorate_tile(tile: Node3D, height_offset: float, x: int, y: int):
         var light := OmniLight3D.new()
         light.light_color = Color(0.4 + rng.randf() * 0.2, 0.6 + rng.randf() * 0.3, 0.9)
         light.light_energy = 0.8
-        light.range = 10.0
+        light.omni_range = 10.0
         light.position = Vector3(rng.randf_range(-tile_size * 0.28, tile_size * 0.28), 0.6 + height_offset * 0.2, rng.randf_range(-tile_size * 0.28, tile_size * 0.28))
         tile.add_child(light)
     elif roll < 0.26:
