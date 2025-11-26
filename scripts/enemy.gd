@@ -452,7 +452,9 @@ func _apply_variant_style(style_override: Dictionary = {}):
     _tint_mesh(head_mesh, style.get("body", Color.WHITE))
     accent_meshes.clear()
     var visor := $Visual.get_node_or_null("Visor")
-    var harness := $Visual.get_node_or_null("Harness") or $Visual.get_node_or_null("Joints")
+    var harness := $Visual.get_node_or_null("Harness")
+    if harness == null:
+        harness = $Visual.get_node_or_null("Joints")
     if visor:
         accent_meshes.append(visor)
     if harness:
