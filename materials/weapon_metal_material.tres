@@ -1,8 +1,8 @@
 [gd_resource type="StandardMaterial3D" load_steps=3 format=3]
 
 [sub_resource type="Gradient" id="1"]
-offsets = PackedFloat32Array(0.0, 0.45, 1.0)
-colors = PackedColorArray(0.08, 0.16, 0.32, 1, 0.15, 0.48, 0.86, 1, 0.64, 0.85, 1, 1)
+offsets = PackedFloat32Array(0.0, 0.58, 1.0)
+colors = PackedColorArray(0.08, 0.08, 0.1, 1, 0.26, 0.28, 0.34, 1, 0.7, 0.74, 0.82, 1)
 
 [sub_resource type="GradientTexture2D" id="2"]
 gradient = SubResource( 1 )
@@ -15,11 +15,9 @@ fill_to = Vector2(1, 1)
 [resource]
 albedo_texture = SubResource( 2 )
 uv1_triplanar = true
-uv1_scale = Vector3(3, 3, 3)
-metallic = 0.32
-roughness = 0.22
-emission_enabled = true
-emission = Color(0.18, 0.5, 1, 1)
-emission_energy = 1.0
-clearcoat = 0.45
-clearcoat_roughness = 0.2
+uv1_scale = Vector3(4, 4, 4)
+metallic = 0.62
+roughness = 0.24
+emission_enabled = false
+clearcoat = 0.3
+clearcoat_roughness = 0.24
