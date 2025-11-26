@@ -116,15 +116,15 @@ func _compose_mesh(parts: Array) -> Mesh:
     for part in parts:
         var mesh := _build_primitive_mesh(part)
         if mesh:
-            var transform := _part_transform(part)
+            var part_transform := _part_transform(part)
             for surface in range(mesh.get_surface_count()):
-                tool.append_from(mesh, surface, transform)
+                tool.append_from(mesh, surface, part_transform)
     return tool.commit()
 
 func _part_transform(part: Dictionary) -> Transform3D:
     var origin: Vector3 = part.get("origin", Vector3.ZERO)
     var rotation_deg: Vector3 = part.get("rotation_degrees", Vector3.ZERO)
     var scale: Vector3 = part.get("scale", Vector3.ONE)
-    var basis := Basis.from_euler(rotation_deg * (PI / 180.0))
-    basis = basis.scaled(scale)
-    return Transform3D(basis, origin)
+    var part_basis := Basis.from_euler(rotation_deg * (PI / 180.0))
+    part_basis = part_basis.scaled(scale)
+    return Transform3D(part_basis, origin)
