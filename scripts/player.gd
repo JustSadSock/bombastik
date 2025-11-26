@@ -46,6 +46,8 @@ var coyote_timer := 0.0
 var jump_buffer_time := 0.0
 var jumps_used := 0
 
+var sound_assets_generated := false
+
 const MAX_JUMPS := 2
 
 @onready var head: Node3D = $Head
@@ -66,6 +68,7 @@ func _ready():
     Input.set_mouse_mode(Input.MOUSE_MODE_CAPTURED)
     weapon_base_scale = weapon_mesh.scale
     weapon_rest_position = weapon_mesh.position
+    _ensure_sounds()
     _apply_weapon_model()
     update_hud()
 
@@ -218,7 +221,7 @@ func shoot():
         dir = (dir + Vector3(rng.randf_range(-spread, spread), rng.randf_range(-spread, spread), rng.randf_range(-spread, spread))).normalized()
         spawn_projectile(dir, data)
     if fire_audio:
-        fire_audio.play()
+        _play_sound(fire_audio, 520.0, 0.12, 0.65)
     apply_recoil()
     animate_weapon_fire(data)
     update_hud()
@@ -263,7 +266,7 @@ func take_damage(amount: float):
     update_hud()
     damage_shake_time = 0.25
     if hurt_audio:
-        hurt_audio.play()
+        _play_sound(hurt_audio, 200.0, 0.2, 0.55)
     var hud = get_tree().get_first_node_in_group("hud")
     if hud and hud.has_method("flash_damage"):
         hud.flash_damage()
@@ -307,7 +310,7 @@ func apply_headbob(delta: float, _direction: Vector3):
         weapon_mesh.position = weapon_mesh.position.lerp(weapon_rest_position + Vector3(0, bob_offset, 0), 8.0 * delta)
         weapon_mesh.rotation.z = lerp(weapon_mesh.rotation.z, sin(bob_time * 2.0) * head_bob_amount * 1.8, 8.0 * delta)
         if step_audio and not step_audio.playing and fmod(bob_time, PI) < 0.1:
-            step_audio.play()
+            _play_sound(step_audio, 140.0, 0.08, 0.4)
     else:
         bob_time = 0.0
         weapon_mesh.position = weapon_mesh.position.lerp(weapon_rest_position, 10.0 * delta)
@@ -452,3 +455,56 @@ func start_slide(direction: Vector3):
     if slide_direction == Vector3.ZERO:
         slide_direction = -head.global_transform.basis.z.normalized()
     slide_time = slide_duration
+
+func apply_settings(settings: Dictionary):
+    if settings.has("sensitivity"):
+        camera_sensitivity = settings.get("sensitivity")
+    if settings.has("master_volume"):
+        var vol: float = settings.get("master_volume")
+        AudioServer.set_bus_volume_db(AudioServer.get_bus_index("Master"), linear_to_db(clamp(vol, 0.0, 1.0)))
+    _ensure_sounds()
+
+func _ensure_sounds():
+    if sound_assets_generated:
+        return
+    if fire_audio:
+        fire_audio.stream = _build_tone(520.0, 0.12, 0.65)
+    if hurt_audio:
+        hurt_audio.stream = _build_tone(200.0, 0.2, 0.55)
+    if step_audio:
+        step_audio.stream = _build_tone(140.0, 0.08, 0.4)
+    sound_assets_generated = true
+
+func _play_sound(player: AudioStreamPlayer3D, freq: float, duration: float, amplitude: float):
+    if not player:
+        return
+    if not player.stream:
+        player.stream = _build_tone(freq, duration, amplitude)
+    var playback = player.get_stream_playback()
+    if playback is AudioStreamGeneratorPlayback:
+        _fill_generator(playback, freq, duration, amplitude)
+    player.play()
+
+func _build_tone(freq: float, duration: float, amplitude: float) -> AudioStream:
+    var sample := AudioStreamWAV.new()
+    sample.mix_rate = 44100
+    sample.format = AudioStreamWAV.FORMAT_16_BITS
+    sample.stereo = false
+    sample.loop_mode = AudioStreamWAV.LOOP_DISABLED
+    var length := int(duration * sample.mix_rate)
+    var data := PackedByteArray()
+    data.resize(length * 2)
+    for i in length:
+        var t = float(i) / sample.mix_rate
+        var value = sin(TAU * freq * t) * amplitude
+        data.encode_s16(i * 2, int(clamp(value, -1.0, 1.0) * 32767))
+    sample.data = data
+    return sample
+
+func _fill_generator(playback: AudioStreamGeneratorPlayback, freq: float, duration: float, amplitude: float):
+    var sample_rate = playback.get_stream().mix_rate
+    var frame_count = int(duration * sample_rate)
+    for i in frame_count:
+        var t = float(i) / sample_rate
+        var sample = sin(TAU * freq * t) * amplitude
+        playback.push_frame(Vector2(sample, sample))

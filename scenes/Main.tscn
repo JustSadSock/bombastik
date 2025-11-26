@@ -1,4 +1,4 @@
-[gd_scene load_steps=8 format=3]
+[gd_scene load_steps=9 format=3]
 
 [ext_resource type="Script" path="res://scripts/game.gd" id="1"]
 [ext_resource type="PackedScene" path="res://scenes/LevelTile.tscn" id="2"]
@@ -6,6 +6,7 @@
 [ext_resource type="PackedScene" path="res://scenes/Enemy.tscn" id="4"]
 [ext_resource type="PackedScene" path="res://scenes/WeaponPickup.tscn" id="5"]
 [ext_resource type="PackedScene" path="res://scenes/HUD.tscn" id="6"]
+[ext_resource type="Script" path="res://scripts/main_menu.gd" id="7"]
 
 [sub_resource type="Sky" id="1"]
 
@@ -34,4 +35,111 @@ light_energy = 2.0
 [node name="Enemies" type="Node3D" parent="."]
 
 [node name="HUD" parent="." instance=ExtResource( 6 )]
+
+[node name="Menu" type="CanvasLayer" parent="."]
+script = ExtResource( 7 )
+
+[node name="ColorRect" type="ColorRect" parent="Menu"]
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+color = Color(0, 0, 0, 0.62)
+
+[node name="MarginContainer" type="MarginContainer" parent="Menu"]
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = 80.0
+offset_top = 60.0
+offset_right = -80.0
+offset_bottom = -60.0
+
+[node name="Panel" type="Panel" parent="Menu/MarginContainer"]
+custom_minimum_size = Vector2(620, 520)
+
+[node name="VBoxContainer" type="VBoxContainer" parent="Menu/MarginContainer/Panel"]
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = 24.0
+offset_top = 24.0
+offset_right = -24.0
+offset_bottom = -24.0
+theme_override_constants/separation = 14
+
+[node name="Title" type="Label" parent="Menu/MarginContainer/Panel/VBoxContainer"]
+text = "BOMBASTIK"
+theme_override_font_sizes/font_size = 30
+
+[node name="Subtitle" type="Label" parent="Menu/MarginContainer/Panel/VBoxContainer"]
+text = "Арена с вариативными врагами"
+theme_override_font_sizes/font_size = 16
+
+[node name="StartButton" type="Button" parent="Menu/MarginContainer/Panel/VBoxContainer"]
+text = "Начать игру"
+
+[node name="ResumeButton" type="Button" parent="Menu/MarginContainer/Panel/VBoxContainer"]
+text = "Продолжить"
+
+[node name="SettingsButton" type="Button" parent="Menu/MarginContainer/Panel/VBoxContainer"]
+text = "Настройки"
+
+[node name="SettingsPanel" type="VBoxContainer" parent="Menu/MarginContainer/Panel/VBoxContainer"]
+visible = false
+theme_override_constants/separation = 8
+
+[node name="SettingsLabel" type="Label" parent="Menu/MarginContainer/Panel/VBoxContainer/SettingsPanel"]
+text = "Параметры"
+theme_override_font_sizes/font_size = 16
+
+[node name="MasterRow" type="HBoxContainer" parent="Menu/MarginContainer/Panel/VBoxContainer/SettingsPanel"]
+theme_override_constants/separation = 12
+
+[node name="MasterLabel" type="Label" parent="Menu/MarginContainer/Panel/VBoxContainer/SettingsPanel/MasterRow"]
+text = "Громкость"
+
+[node name="MasterVolume" type="HSlider" parent="Menu/MarginContainer/Panel/VBoxContainer/SettingsPanel/MasterRow"]
+size_flags_horizontal = 3
+max_value = 1.0
+step = 0.01
+value = 1.0
+
+[node name="MasterValue" type="Label" parent="Menu/MarginContainer/Panel/VBoxContainer/SettingsPanel/MasterRow"]
+text = "100%"
+
+[node name="MusicRow" type="HBoxContainer" parent="Menu/MarginContainer/Panel/VBoxContainer/SettingsPanel"]
+theme_override_constants/separation = 12
+
+[node name="MusicLabel" type="Label" parent="Menu/MarginContainer/Panel/VBoxContainer/SettingsPanel/MusicRow"]
+text = "Музыка"
+
+[node name="MusicVolume" type="HSlider" parent="Menu/MarginContainer/Panel/VBoxContainer/SettingsPanel/MusicRow"]
+size_flags_horizontal = 3
+max_value = 1.0
+step = 0.01
+value = 0.45
+
+[node name="MusicValue" type="Label" parent="Menu/MarginContainer/Panel/VBoxContainer/SettingsPanel/MusicRow"]
+text = "45%"
+
+[node name="SensitivityRow" type="HBoxContainer" parent="Menu/MarginContainer/Panel/VBoxContainer/SettingsPanel"]
+theme_override_constants/separation = 12
+
+[node name="SensitivityLabel" type="Label" parent="Menu/MarginContainer/Panel/VBoxContainer/SettingsPanel/SensitivityRow"]
+text = "Чувствительность мыши"
+
+[node name="Sensitivity" type="HSlider" parent="Menu/MarginContainer/Panel/VBoxContainer/SettingsPanel/SensitivityRow"]
+size_flags_horizontal = 3
+max_value = 0.006
+step = 0.0001
+value = 0.002
+
+[node name="SensitivityValue" type="Label" parent="Menu/MarginContainer/Panel/VBoxContainer/SettingsPanel/SensitivityRow"]
+text = "0.0020"
+
+[node name="QuitButton" type="Button" parent="Menu/MarginContainer/Panel/VBoxContainer"]
+text = "Выход"
+
+[node name="MenuMusic" type="AudioStreamPlayer" parent="Menu"]
+bus = "Master"
 

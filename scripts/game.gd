@@ -13,6 +13,7 @@ const DEFAULT_PICKUP_SCENE := preload("res://scenes/WeaponPickup.tscn")
 @export var tile_height_variation := 1.2
 @export var cover_chance := 0.18
 @export var vertical_feature_chance := 0.22
+@export var auto_start := false
 @export var tile_scene: PackedScene = DEFAULT_TILE_SCENE
 @export var player_scene: PackedScene = DEFAULT_PLAYER_SCENE
 @export var enemy_scene: PackedScene = DEFAULT_ENEMY_SCENE
@@ -24,11 +25,17 @@ var player: Node3D
 var rng := RandomNumberGenerator.new()
 var game_over := false
 var height_noise := FastNoiseLite.new()
+var menu_controller: Node
+var pending_settings := {
+    "sensitivity": 0.002,
+    "master_volume": 1.0,
+}
 
 @onready var level_root: Node3D = $Level
 @onready var pickup_root: Node3D = $Pickups
 @onready var enemy_root: Node3D = $Enemies
 @onready var hud = $HUD
+@onready var menu = $Menu
 
 func _ready():
     rng.randomize()
@@ -42,10 +49,14 @@ func _ready():
     pickup_scene = pickup_scene if pickup_scene else DEFAULT_PICKUP_SCENE
     if hud and hud.has_signal("restart_requested"):
         hud.restart_requested.connect(restart_requested)
-    start_round()
+    if auto_start:
+        start_round()
+    else:
+        Input.set_mouse_mode(Input.MOUSE_MODE_VISIBLE)
 
 func start_round():
     game_over = false
+    get_tree().paused = false
     Input.set_mouse_mode(Input.MOUSE_MODE_CAPTURED)
     clear_game()
     generate_level()
@@ -54,6 +65,8 @@ func start_round():
     spawn_enemies()
     if hud and hud.has_method("hide_status"):
         hud.hide_status()
+    if menu_controller and menu_controller.has_method("sync_after_start"):
+        menu_controller.sync_after_start()
 
 func clear_game():
     floor_positions.clear()
@@ -175,6 +188,8 @@ func spawn_player():
     player = player_scene.instantiate()
     add_child(player)
     player.global_transform.origin = Vector3(grid_size.x * tile_size * 0.5, 2.0, grid_size.y * tile_size * 0.5)
+    if player.has_method("apply_settings"):
+        player.apply_settings(pending_settings)
     player.set_weapons(WeaponData.WEAPONS)
     if player.has_signal("died"):
         player.died.connect(_on_player_died)
@@ -226,6 +241,15 @@ func get_random_floor_position(min_distance := 0.0) -> Vector3:
     return floor_positions[0]
 
 func _unhandled_input(event):
+    var wants_pause: bool = event.is_action_pressed("ui_cancel")
+    if event is InputEventKey and event.pressed and event.keycode == KEY_ESCAPE:
+        wants_pause = true
+    if not game_over and wants_pause:
+        if menu_controller and menu_controller.has_method("show_menu"):
+            menu_controller.show_menu(true, true)
+        Input.set_mouse_mode(Input.MOUSE_MODE_VISIBLE)
+        get_tree().paused = true
+        return
     if not game_over:
         return
     if event is InputEventKey and event.pressed and (event.keycode == KEY_R or event.keycode == KEY_ENTER or event.keycode == KEY_SPACE):
@@ -243,3 +267,21 @@ func restart_requested():
     if not game_over:
         return
     start_round()
+
+func set_menu_controller(menu_ref: Node):
+    menu_controller = menu_ref
+
+func apply_settings(settings: Dictionary):
+    pending_settings.merge(settings, true)
+    if is_instance_valid(player) and player.has_method("apply_settings"):
+        player.apply_settings(pending_settings)
+
+func begin_game(settings: Dictionary):
+    apply_settings(settings)
+    start_round()
+
+func resume_game():
+    get_tree().paused = false
+    Input.set_mouse_mode(Input.MOUSE_MODE_CAPTURED)
+    if menu_controller and menu_controller.has_method("hide_menu"):
+        menu_controller.hide_menu()
