@@ -457,9 +457,12 @@ func _apply_variant_style(style_override: Dictionary = {}):
         accent_meshes.append(visor)
     if harness:
         accent_meshes.append(harness)
+    var has_accent := style.has("accent")
+    var accent_color: Color = style.get("accent", Color.WHITE)
     for mesh in accent_meshes:
         if mesh:
-            _tint_mesh(mesh, style.get("accent", _get_mesh_color(mesh)))
+            var tint := accent_color if has_accent else _get_mesh_color(mesh)
+            _tint_mesh(mesh, tint)
     if glow:
         glow.light_color = style.get("light", glow.light_color)
         glow.light_energy = 1.0 + rng.randf_range(-0.1, 0.3)
