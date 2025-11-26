@@ -1,5 +1,7 @@
 extends CharacterBody3D
 
+signal died
+
 var gravity: float = ProjectSettings.get_setting("physics/3d/default_gravity")
 
 const DEFAULT_PROJECTILE_SCENE := preload("res://scenes/Projectile.tscn")
@@ -25,6 +27,7 @@ var health := 100.0
 var bob_time := 0.0
 var damage_shake_time := 0.0
 var weapon_rest_position := Vector3.ZERO
+var is_dead := false
 
 @onready var head: Node3D = $Head
 @onready var camera: Camera3D = $Head/Camera3D
@@ -54,10 +57,14 @@ func _unhandled_input(event):
         rotate_y(-event.relative.x * camera_sensitivity)
         head.rotate_x(-event.relative.y * camera_sensitivity)
         head.rotation_degrees.x = clamp(head.rotation_degrees.x, -80, 80)
+    if event is InputEventMouseButton and event.pressed:
+        Input.set_mouse_mode(Input.MOUSE_MODE_CAPTURED)
     if event is InputEventKey and event.pressed and event.keycode == KEY_ESCAPE:
         Input.set_mouse_mode(Input.MOUSE_MODE_VISIBLE)
 
 func _physics_process(delta):
+    if is_dead:
+        return
     if not is_on_floor():
         velocity.y -= gravity * delta
     var input_dir = Input.get_vector("move_left", "move_right", "move_forward", "move_backward")
@@ -75,6 +82,8 @@ func _physics_process(delta):
     apply_headbob(delta, direction)
 
 func _process(delta):
+    if is_dead:
+        return
     if cooldown > 0.0:
         cooldown = max(0.0, cooldown - delta)
     if Input.is_action_just_pressed("switch_next"):
@@ -138,6 +147,8 @@ func update_hud():
         hud.update_health(health, max_health)
 
 func take_damage(amount: float):
+    if is_dead:
+        return
     health = clamp(health - amount, 0.0, max_health)
     update_hud()
     damage_shake_time = 0.25
@@ -150,6 +161,11 @@ func take_damage(amount: float):
         die()
 
 func die():
+    if is_dead:
+        return
+    is_dead = true
+    emit_signal("died")
+    Input.set_mouse_mode(Input.MOUSE_MODE_VISIBLE)
     queue_free()
 
 func apply_crouch(delta: float, is_crouching: bool):
