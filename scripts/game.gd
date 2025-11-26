@@ -5,6 +5,7 @@ const WeaponData = preload("res://scripts/weapon_data.gd")
 const DEFAULT_TILE_SCENE := preload("res://scenes/LevelTile.tscn")
 const DEFAULT_PLAYER_SCENE := preload("res://scenes/Player.tscn")
 const DEFAULT_ENEMY_SCENE := preload("res://scenes/Enemy.tscn")
+const DEFAULT_RANGED_ENEMY_SCENE := preload("res://scenes/RangedEnemy.tscn")
 const DEFAULT_PICKUP_SCENE := preload("res://scenes/WeaponPickup.tscn")
 
 @export var grid_size := Vector2i(10, 10)
@@ -14,6 +15,7 @@ const DEFAULT_PICKUP_SCENE := preload("res://scenes/WeaponPickup.tscn")
 @export var tile_scene: PackedScene = DEFAULT_TILE_SCENE
 @export var player_scene: PackedScene = DEFAULT_PLAYER_SCENE
 @export var enemy_scene: PackedScene = DEFAULT_ENEMY_SCENE
+@export var ranged_enemy_scene: PackedScene = DEFAULT_RANGED_ENEMY_SCENE
 @export var pickup_scene: PackedScene = DEFAULT_PICKUP_SCENE
 
 var floor_positions: Array = []
@@ -31,6 +33,7 @@ func _ready():
     tile_scene = tile_scene if tile_scene else DEFAULT_TILE_SCENE
     player_scene = player_scene if player_scene else DEFAULT_PLAYER_SCENE
     enemy_scene = enemy_scene if enemy_scene else DEFAULT_ENEMY_SCENE
+    ranged_enemy_scene = ranged_enemy_scene if ranged_enemy_scene else DEFAULT_RANGED_ENEMY_SCENE
     pickup_scene = pickup_scene if pickup_scene else DEFAULT_PICKUP_SCENE
     if hud and hud.has_signal("restart_requested"):
         hud.restart_requested.connect(restart_requested)
@@ -124,17 +127,34 @@ func spawn_pickups():
         pickup.global_transform.origin = pickup_position
 
 func spawn_enemies():
-    for i in range(8):
-        var enemy = enemy_scene.instantiate()
-        enemy.target = player
-        var enemy_position = get_random_floor_position() + Vector3(0, 0.5, 0)
-        enemy_root.add_child(enemy)
-        enemy.global_transform.origin = enemy_position
+    var melee_count := 6
+    var ranged_count := 4
+    for i in range(melee_count):
+        _spawn_enemy(enemy_scene)
+    for i in range(ranged_count):
+        _spawn_enemy(ranged_enemy_scene)
 
-func get_random_floor_position() -> Vector3:
+func _spawn_enemy(scene: PackedScene):
+    if scene == null:
+        return
+    var enemy = scene.instantiate()
+    enemy.target = player
+    var enemy_position = get_random_floor_position(tile_size * 2.5) + Vector3(0, 0.5, 0)
+    enemy_root.add_child(enemy)
+    enemy.global_transform.origin = enemy_position
+
+func get_random_floor_position(min_distance := 0.0) -> Vector3:
     if floor_positions.is_empty():
         return Vector3.ZERO
-    return floor_positions[rng.randi_range(0, floor_positions.size() - 1)]
+    var attempts := 0
+    while attempts < 12:
+        var candidate = floor_positions[rng.randi_range(0, floor_positions.size() - 1)]
+        if not is_instance_valid(player) or min_distance <= 0.0:
+            return candidate
+        if candidate.distance_to(player.global_transform.origin) >= min_distance:
+            return candidate
+        attempts += 1
+    return floor_positions[0]
 
 func _unhandled_input(event):
     if not game_over:

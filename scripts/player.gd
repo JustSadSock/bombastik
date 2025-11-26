@@ -13,6 +13,9 @@ const DEFAULT_EXPLOSION_SCENE := preload("res://scenes/Explosion.tscn")
 @export var jump_velocity := 4.5
 @export var slide_speed := 16.0
 @export var slide_duration := 0.55
+@export var step_height := 0.8
+@export var step_check_distance := 0.65
+@export var coyote_time := 0.18
 @export var camera_sensitivity := 0.002
 @export var head_bob_speed := 6.0
 @export var head_bob_amount := 0.02
@@ -34,11 +37,12 @@ var wants_recap_mouse := true
 var force_move_input := Vector2.ZERO
 var slide_time := 0.0
 var slide_direction := Vector3.ZERO
+var coyote_timer := 0.0
 
 @onready var head: Node3D = $Head
 @onready var camera: Camera3D = $Head/Camera3D
 @onready var muzzle: Marker3D = $Head/Muzzle
-@onready var weapon_mesh: MeshInstance3D = $Head/WeaponMesh
+@onready var weapon_mesh: Node3D = $Head/WeaponMesh
 @onready var fire_audio: AudioStreamPlayer3D = $Head/FireAudio
 @onready var hurt_audio: AudioStreamPlayer3D = $Head/HurtAudio
 @onready var step_audio: AudioStreamPlayer3D = $Head/StepAudio
@@ -49,6 +53,7 @@ func _ready():
     health = max_health
     projectile_scene = projectile_scene if projectile_scene else DEFAULT_PROJECTILE_SCENE
     explosion_scene = explosion_scene if explosion_scene else DEFAULT_EXPLOSION_SCENE
+    floor_snap_length = max(floor_snap_length, step_height)
     Input.set_mouse_mode(Input.MOUSE_MODE_CAPTURED)
     weapon_rest_position = weapon_mesh.position
     update_hud()
@@ -83,8 +88,9 @@ func _unhandled_input(event):
     if event.is_action_pressed("fire"):
         recapture_mouse()
         shoot()
-    if event.is_action_pressed("jump") and is_on_floor():
+    if event.is_action_pressed("jump") and (is_on_floor() or coyote_timer > 0.0):
         velocity.y = jump_velocity
+        coyote_timer = 0.0
         recapture_mouse()
 
 func _notification(what):
@@ -99,6 +105,9 @@ func _physics_process(delta):
         return
     if not is_on_floor():
         velocity.y -= gravity * delta
+        coyote_timer = max(0.0, coyote_timer - delta)
+    else:
+        coyote_timer = coyote_time
     var input_dir = Input.get_vector("move_left", "move_right", "move_forward", "move_backward")
     if input_dir == Vector2.ZERO and force_move_input != Vector2.ZERO:
         input_dir = force_move_input.normalized()
@@ -120,6 +129,11 @@ func _physics_process(delta):
         velocity.z = direction.z * target_speed
     if Input.is_action_just_pressed("jump") and is_on_floor():
         velocity.y = jump_velocity
+        coyote_timer = 0.0
+    elif Input.is_action_just_pressed("jump") and coyote_timer > 0.0:
+        velocity.y = jump_velocity
+        coyote_timer = 0.0
+    apply_step_assist(direction)
     move_and_slide()
     apply_crouch(delta, is_crouching)
     apply_headbob(delta, direction)
@@ -244,6 +258,19 @@ func apply_crouch(delta: float, is_crouching: bool):
     var shape: CapsuleShape3D = collision_shape.shape
     if shape:
         shape.height = lerp(shape.height, 1.2 if is_crouching else 1.8, 8.0 * delta)
+
+func apply_step_assist(direction: Vector3):
+    if not is_on_floor():
+        return
+    if direction.length() < 0.1:
+        return
+    var motion = direction.normalized() * step_check_distance
+    var low_origin := global_transform.translated(Vector3(0, 0.05, 0))
+    if test_move(low_origin, motion):
+        var raised := global_transform.translated(Vector3(0, step_height, 0))
+        if not test_move(raised, motion):
+            global_transform = raised
+            velocity.y = 0.0
 
 func apply_headbob(delta: float, _direction: Vector3):
     var horizontal_speed = Vector2(velocity.x, velocity.z).length()
