@@ -176,9 +176,13 @@ func apply_headbob(delta: float, _direction: Vector3):
     if damage_shake_time > 0.0:
         damage_shake_time = max(0.0, damage_shake_time - delta)
         var shake_strength = camera_shake * (damage_shake_time / 0.25)
-        camera.translation = Vector3(randf_range(-shake_strength, shake_strength), randf_range(-shake_strength, shake_strength), 0)
+        camera.position = Vector3(
+            randf_range(-shake_strength, shake_strength),
+            randf_range(-shake_strength, shake_strength),
+            0
+        )
     else:
-        camera.translation = camera.translation.lerp(Vector3.ZERO, 12.0 * delta)
+        camera.position = camera.position.lerp(Vector3.ZERO, 12.0 * delta)
 
 func apply_recoil():
     head.rotation.x = clamp(head.rotation.x - 0.01, deg_to_rad(-80), deg_to_rad(80))
