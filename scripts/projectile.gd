@@ -50,7 +50,13 @@ func _apply_tint():
         mat.emission = tint * 0.55
         mesh_instance.material_override = mat
     if trail:
-        trail.modulate = tint
+        var particle_material: ParticleProcessMaterial
+        if trail.process_material and trail.process_material is ParticleProcessMaterial:
+            particle_material = trail.process_material.duplicate()
+        else:
+            particle_material = ParticleProcessMaterial.new()
+        particle_material.color = tint
+        trail.process_material = particle_material
 
 func _apply_shape():
     if not mesh_instance:
