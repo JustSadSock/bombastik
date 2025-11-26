@@ -39,42 +39,9 @@ func _apply_visuals():
 
 func _build_mesh(data: Dictionary, id: String) -> Mesh:
     if data.has("type"):
-        match data.get("type"):
-            "box":
-                var box := BoxMesh.new()
-                box.size = data.get("size", Vector3(0.38, 0.24, 0.52))
-                return box
-            "prism":
-                var prism := PrismMesh.new()
-                prism.size = data.get("size", Vector3(0.9, 0.3, 0.3))
-                return prism
-            "cylinder":
-                var cylinder := CylinderMesh.new()
-                cylinder.height = data.get("height", 0.8)
-                cylinder.top_radius = data.get("top_radius", 0.2)
-                cylinder.bottom_radius = data.get("bottom_radius", 0.24)
-                cylinder.radial_segments = data.get("segments", 18)
-                return cylinder
-            "capsule":
-                var capsule := CapsuleMesh.new()
-                capsule.radius = data.get("radius", 0.2)
-                capsule.height = data.get("height", 0.8)
-                capsule.radial_segments = data.get("segments", 12)
-                return capsule
-            "cone":
-                var cone := CylinderMesh.new()
-                cone.height = data.get("height", 0.82)
-                cone.top_radius = data.get("top_radius", 0.08)
-                cone.bottom_radius = data.get("bottom_radius", 0.3)
-                cone.radial_segments = data.get("segments", 18)
-                return cone
-            "torus":
-                var torus := TorusMesh.new()
-                torus.inner_radius = data.get("inner_radius", 0.12)
-                torus.outer_radius = data.get("outer_radius", 0.32)
-                torus.ring_segments = data.get("ring_segments", 18)
-                torus.radial_segments = data.get("radial_segments", 12)
-                return torus
+        if data.get("type") == "composite":
+            return _compose_mesh(data.get("parts", []))
+        return _build_primitive_mesh(data)
     match id:
         "rifle":
             var fallback_prism := PrismMesh.new()
@@ -99,6 +66,67 @@ func _build_mesh(data: Dictionary, id: String) -> Mesh:
             var default_box := BoxMesh.new()
             default_box.size = Vector3(0.38, 0.26, 0.52)
             return default_box
+
+func _build_primitive_mesh(data: Dictionary) -> Mesh:
+    match data.get("type"):
+        "box":
+            var box := BoxMesh.new()
+            box.size = data.get("size", Vector3(0.38, 0.24, 0.52))
+            return box
+        "prism":
+            var prism := PrismMesh.new()
+            prism.size = data.get("size", Vector3(0.9, 0.3, 0.3))
+            return prism
+        "cylinder":
+            var cylinder := CylinderMesh.new()
+            cylinder.height = data.get("height", 0.8)
+            cylinder.top_radius = data.get("top_radius", 0.2)
+            cylinder.bottom_radius = data.get("bottom_radius", 0.24)
+            cylinder.radial_segments = data.get("segments", 18)
+            return cylinder
+        "capsule":
+            var capsule := CapsuleMesh.new()
+            capsule.radius = data.get("radius", 0.2)
+            capsule.height = data.get("height", 0.8)
+            capsule.radial_segments = data.get("segments", 12)
+            return capsule
+        "cone":
+            var cone := CylinderMesh.new()
+            cone.height = data.get("height", 0.82)
+            cone.top_radius = data.get("top_radius", 0.08)
+            cone.bottom_radius = data.get("bottom_radius", 0.3)
+            cone.radial_segments = data.get("segments", 18)
+            return cone
+        "torus":
+            var torus := TorusMesh.new()
+            torus.inner_radius = data.get("inner_radius", 0.12)
+            torus.outer_radius = data.get("outer_radius", 0.32)
+            torus.ring_segments = data.get("ring_segments", 18)
+            torus.rings = data.get("rings", 12)
+            return torus
+        _:
+            return null
+
+func _compose_mesh(parts: Array) -> Mesh:
+    if parts.is_empty():
+        return null
+    var tool := SurfaceTool.new()
+    tool.begin(Mesh.PRIMITIVE_TRIANGLES)
+    for part in parts:
+        var piece := _build_primitive_mesh(part)
+        if piece:
+            var transform := _part_transform(part)
+            for surface in range(piece.get_surface_count()):
+                tool.append_from(piece, surface, transform)
+    return tool.commit()
+
+func _part_transform(part: Dictionary) -> Transform3D:
+    var origin: Vector3 = part.get("origin", Vector3.ZERO)
+    var rotation_deg: Vector3 = part.get("rotation_degrees", Vector3.ZERO)
+    var scale: Vector3 = part.get("scale", Vector3.ONE)
+    var basis := Basis.from_euler(rotation_deg * (PI / 180.0))
+    basis = basis.scaled(scale)
+    return Transform3D(basis, origin)
 
 func _get_weapon_data() -> Dictionary:
     for data in WeaponData.WEAPONS:

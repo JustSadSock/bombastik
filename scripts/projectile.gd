@@ -62,6 +62,11 @@ func _apply_shape():
 func _build_mesh(data: Dictionary) -> Mesh:
     if not data.has("type"):
         return null
+    if data.get("type") == "composite":
+        return _compose_mesh(data.get("parts", []))
+    return _build_primitive_mesh(data)
+
+func _build_primitive_mesh(data: Dictionary) -> Mesh:
     match data.get("type"):
         "box":
             var box := BoxMesh.new()
@@ -93,5 +98,33 @@ func _build_mesh(data: Dictionary) -> Mesh:
             cone.bottom_radius = data.get("bottom_radius", 0.2)
             cone.radial_segments = data.get("segments", 16)
             return cone
+        "torus":
+            var torus := TorusMesh.new()
+            torus.inner_radius = data.get("inner_radius", 0.08)
+            torus.outer_radius = data.get("outer_radius", 0.18)
+            torus.ring_segments = data.get("ring_segments", 16)
+            torus.rings = data.get("rings", 12)
+            return torus
         _:
             return null
+
+func _compose_mesh(parts: Array) -> Mesh:
+    if parts.is_empty():
+        return null
+    var tool := SurfaceTool.new()
+    tool.begin(Mesh.PRIMITIVE_TRIANGLES)
+    for part in parts:
+        var mesh := _build_primitive_mesh(part)
+        if mesh:
+            var transform := _part_transform(part)
+            for surface in range(mesh.get_surface_count()):
+                tool.append_from(mesh, surface, transform)
+    return tool.commit()
+
+func _part_transform(part: Dictionary) -> Transform3D:
+    var origin: Vector3 = part.get("origin", Vector3.ZERO)
+    var rotation_deg: Vector3 = part.get("rotation_degrees", Vector3.ZERO)
+    var scale: Vector3 = part.get("scale", Vector3.ONE)
+    var basis := Basis.from_euler(rotation_deg * (PI / 180.0))
+    basis = basis.scaled(scale)
+    return Transform3D(basis, origin)
