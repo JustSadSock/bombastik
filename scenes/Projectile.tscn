@@ -1,7 +1,11 @@
-[gd_scene load_steps=3 format=3]
+[gd_scene load_steps=5 format=3]
 
 [ext_resource type="Script" path="res://scripts/projectile.gd" id="1"]
 [ext_resource type="Material" path="res://materials/projectile_material.tres" id="2"]
+
+[sub_resource type="SphereMesh" id="1"]
+
+[sub_resource type="SphereShape3D" id="2"]
 
 [node name="Projectile" type="Area3D"]
 script = ExtResource( 1 )
@@ -11,11 +15,11 @@ monitoring = true
 monitorable = true
 
 [node name="MeshInstance3D" type="MeshInstance3D" parent="."]
-mesh = SphereMesh.new()
+mesh = SubResource( 1 )
 material_override = ExtResource( 2 )
 
 [node name="CollisionShape3D" type="CollisionShape3D" parent="."]
-shape = SphereShape3D.new()
+shape = SubResource( 2 )
 
 [node name="Trail" type="CPUParticles3D" parent="."]
 emitting = true

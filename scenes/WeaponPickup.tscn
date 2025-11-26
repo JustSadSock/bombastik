@@ -1,7 +1,11 @@
-[gd_scene load_steps=3 format=3]
+[gd_scene load_steps=6 format=3]
 
 [ext_resource type="Script" path="res://scripts/weapon_pickup.gd" id="1"]
 [ext_resource type="Material" path="res://materials/pickup_material.tres" id="2"]
+
+[sub_resource type="BoxShape3D" id="1"]
+
+[sub_resource type="BoxMesh" id="2"]
 
 [node name="WeaponPickup" type="Area3D"]
 script = ExtResource( 1 )
@@ -11,10 +15,10 @@ monitoring = true
 monitorable = true
 
 [node name="CollisionShape3D" type="CollisionShape3D" parent="."]
-shape = BoxShape3D.new()
+shape = SubResource( 1 )
 
 [node name="MeshInstance3D" type="MeshInstance3D" parent="."]
-mesh = BoxMesh.new()
+mesh = SubResource( 2 )
 material_override = ExtResource( 2 )
 
 [node name="Label3D" type="Label3D" parent="."]
