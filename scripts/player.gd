@@ -52,7 +52,9 @@ func set_weapons(list: Array):
     current_weapon_index = 0
     update_hud()
 
-func _unhandled_input(event):
+func _input(event):
+    if is_dead:
+        return
     if event is InputEventMouseMotion:
         rotate_y(-event.relative.x * camera_sensitivity)
         head.rotate_x(-event.relative.y * camera_sensitivity)
@@ -61,6 +63,9 @@ func _unhandled_input(event):
         Input.set_mouse_mode(Input.MOUSE_MODE_CAPTURED)
     if event is InputEventKey and event.pressed and event.keycode == KEY_ESCAPE:
         Input.set_mouse_mode(Input.MOUSE_MODE_VISIBLE)
+    if event.is_pressed() and (event.is_action("fire") or event.is_action("jump") or event.is_action("move_forward")
+            or event.is_action("move_backward") or event.is_action("move_left") or event.is_action("move_right")):
+        Input.set_mouse_mode(Input.MOUSE_MODE_CAPTURED)
 
 func _physics_process(delta):
     if is_dead:
