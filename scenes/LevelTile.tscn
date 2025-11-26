@@ -4,7 +4,8 @@
 
 [sub_resource type="PlaneMesh" id="1"]
 
-[sub_resource type="PlaneShape3D" id="2"]
+[sub_resource type="BoxShape3D" id="2"]
+size = Vector3( 5, 0.1, 5 )
 
 [sub_resource type="NavigationMesh" id="3"]
 
