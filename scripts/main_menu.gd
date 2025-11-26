@@ -1,4 +1,4 @@
-extends Control
+extends CanvasLayer
 
 @export var default_sensitivity := 0.002
 @export var default_master_volume := 1.0
