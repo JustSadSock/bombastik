@@ -12,9 +12,9 @@ const DEFAULT_EXPLOSION_SCENE := preload("res://scenes/Explosion.tscn")
 @export var crouch_multiplier := 0.6
 @export var jump_velocity := 4.5
 @export var camera_sensitivity := 0.002
-@export var head_bob_speed := 7.5
-@export var head_bob_amount := 0.045
-@export var camera_shake := 0.08
+@export var head_bob_speed := 6.0
+@export var head_bob_amount := 0.02
+@export var camera_shake := 0.035
 @export var projectile_scene: PackedScene = DEFAULT_PROJECTILE_SCENE
 @export var explosion_scene: PackedScene = DEFAULT_EXPLOSION_SCENE
 @export var max_health := 100.0
@@ -29,6 +29,7 @@ var damage_shake_time := 0.0
 var weapon_rest_position := Vector3.ZERO
 var is_dead := false
 var wants_recap_mouse := true
+var force_move_input := Vector2.ZERO
 
 @onready var head: Node3D = $Head
 @onready var camera: Camera3D = $Head/Camera3D
@@ -68,6 +69,18 @@ func _input(event):
             or event.is_action("move_backward") or event.is_action("move_left") or event.is_action("move_right")):
         recapture_mouse()
 
+func _unhandled_input(event):
+    if is_dead:
+        return
+    if event is InputEventKey:
+        _sync_fallback_move(event)
+    if event.is_action_pressed("fire"):
+        recapture_mouse()
+        shoot()
+    if event.is_action_pressed("jump") and is_on_floor():
+        velocity.y = jump_velocity
+        recapture_mouse()
+
 func _notification(what):
     if is_dead:
         return
@@ -81,6 +94,8 @@ func _physics_process(delta):
     if not is_on_floor():
         velocity.y -= gravity * delta
     var input_dir = Input.get_vector("move_left", "move_right", "move_forward", "move_backward")
+    if input_dir == Vector2.ZERO and force_move_input != Vector2.ZERO:
+        input_dir = force_move_input.normalized()
     var direction = (transform.basis * Vector3(input_dir.x, 0, input_dir.y)).normalized()
     var is_crouching = Input.is_action_pressed("crouch")
     var target_speed = speed * (sprint_multiplier if Input.is_action_pressed("sprint") and not is_crouching else 1.0)
@@ -109,6 +124,28 @@ func _process(delta):
 func recapture_mouse():
     Input.set_mouse_mode(Input.MOUSE_MODE_CAPTURED)
     wants_recap_mouse = Input.get_mouse_mode() != Input.MOUSE_MODE_CAPTURED
+
+func _sync_fallback_move(event: InputEventKey):
+    var dir_map := {
+        KEY_W: Vector2(0, -1),
+        KEY_S: Vector2(0, 1),
+        KEY_A: Vector2(-1, 0),
+        KEY_D: Vector2(1, 0),
+        KEY_UP: Vector2(0, -1),
+        KEY_DOWN: Vector2(0, 1),
+        KEY_LEFT: Vector2(-1, 0),
+        KEY_RIGHT: Vector2(1, 0),
+    }
+    if not dir_map.has(event.keycode):
+        return
+    var delta: Vector2 = dir_map[event.keycode]
+    if event.pressed:
+        force_move_input += delta
+        recapture_mouse()
+    else:
+        force_move_input -= delta
+    force_move_input.x = clamp(force_move_input.x, -1.0, 1.0)
+    force_move_input.y = clamp(force_move_input.y, -1.0, 1.0)
 
 func switch_weapon(step: int):
     if weapons.is_empty():
@@ -181,6 +218,7 @@ func die():
     if is_dead:
         return
     is_dead = true
+    force_move_input = Vector2.ZERO
     emit_signal("died")
     Input.set_mouse_mode(Input.MOUSE_MODE_VISIBLE)
     queue_free()
@@ -197,8 +235,8 @@ func apply_headbob(delta: float, _direction: Vector3):
     if is_on_floor() and horizontal_speed > 0.5:
         bob_time += delta * head_bob_speed * clamp(horizontal_speed / speed, 0.6, 2.0)
         var bob_offset = sin(bob_time) * head_bob_amount
-        weapon_mesh.position = weapon_mesh.position.lerp(weapon_rest_position + Vector3(0, bob_offset, 0), 10.0 * delta)
-        weapon_mesh.rotation.z = lerp(weapon_mesh.rotation.z, sin(bob_time * 2.0) * head_bob_amount * 2.5, 8.0 * delta)
+        weapon_mesh.position = weapon_mesh.position.lerp(weapon_rest_position + Vector3(0, bob_offset, 0), 8.0 * delta)
+        weapon_mesh.rotation.z = lerp(weapon_mesh.rotation.z, sin(bob_time * 2.0) * head_bob_amount * 1.8, 8.0 * delta)
         if step_audio and not step_audio.playing and fmod(bob_time, PI) < 0.1:
             step_audio.play()
     else:
@@ -218,4 +256,4 @@ func apply_headbob(delta: float, _direction: Vector3):
         camera.position = camera.position.lerp(Vector3.ZERO, 12.0 * delta)
 
 func apply_recoil():
-    head.rotation.x = clamp(head.rotation.x - 0.01, deg_to_rad(-80), deg_to_rad(80))
+    head.rotation.x = clamp(head.rotation.x - 0.006, deg_to_rad(-80), deg_to_rad(80))

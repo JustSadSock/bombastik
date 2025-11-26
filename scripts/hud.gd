@@ -3,8 +3,9 @@ extends CanvasLayer
 signal restart_requested
 
 @onready var weapon_label: Label = $MarginContainer/VBoxContainer/WeaponLabel
-@onready var cooldown_bar: TextureProgressBar = $MarginContainer/VBoxContainer/CooldownBar
-@onready var health_bar: TextureProgressBar = $MarginContainer/VBoxContainer/HealthBar
+@onready var cooldown_bar: ProgressBar = $MarginContainer/VBoxContainer/CooldownBar
+@onready var health_bar: ProgressBar = $MarginContainer/VBoxContainer/HealthBar
+@onready var health_value: Label = $MarginContainer/VBoxContainer/HealthContainer/HealthValue
 @onready var crosshair: Label = $Crosshair
 @onready var damage_flash: ColorRect = $DamageFlash
 @onready var status_panel: Control = $Status
@@ -29,6 +30,8 @@ func update_weapon_label(weapons: Array, index: int, cooldown: float):
 func update_health(current: float, max_health: float):
     health_bar.max_value = max_health
     health_bar.value = current
+    if health_value:
+        health_value.text = str(int(current)) + " / " + str(int(max_health))
 
 func flash_damage():
     if damage_flash == null:
