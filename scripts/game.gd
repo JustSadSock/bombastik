@@ -10,8 +10,9 @@ const DEFAULT_PICKUP_SCENE := preload("res://scenes/WeaponPickup.tscn")
 
 @export var grid_size := Vector2i(14, 14)
 @export var tile_size := 6.5
-@export var tile_height_variation := 0.05
+@export var tile_height_variation := 1.2
 @export var cover_chance := 0.18
+@export var vertical_feature_chance := 0.22
 @export var tile_scene: PackedScene = DEFAULT_TILE_SCENE
 @export var player_scene: PackedScene = DEFAULT_PLAYER_SCENE
 @export var enemy_scene: PackedScene = DEFAULT_ENEMY_SCENE
@@ -22,6 +23,7 @@ var floor_positions: Array = []
 var player: Node3D
 var rng := RandomNumberGenerator.new()
 var game_over := false
+var height_noise := FastNoiseLite.new()
 
 @onready var level_root: Node3D = $Level
 @onready var pickup_root: Node3D = $Pickups
@@ -30,6 +32,9 @@ var game_over := false
 
 func _ready():
     rng.randomize()
+    height_noise.seed = randi()
+    height_noise.frequency = 0.07
+    height_noise.fractal_octaves = 3
     tile_scene = tile_scene if tile_scene else DEFAULT_TILE_SCENE
     player_scene = player_scene if player_scene else DEFAULT_PLAYER_SCENE
     enemy_scene = enemy_scene if enemy_scene else DEFAULT_ENEMY_SCENE
@@ -65,12 +70,13 @@ func generate_level():
     for x in range(grid_size.x):
         for y in range(grid_size.y):
             var tile = tile_scene.instantiate()
-            var height_offset = rng.randf_range(-tile_height_variation, tile_height_variation)
+            var height_offset = height_noise.get_noise_2d(x, y) * tile_height_variation
             tile.position = Vector3(x * tile_size, height_offset, y * tile_size)
             tile.rotation_degrees.y = rng.randf_range(-1.2, 1.2)
             level_root.add_child(tile)
             floor_positions.append(tile.global_transform.origin + Vector3(0, 0.55, 0))
             _maybe_add_cover(tile)
+            _maybe_add_vertical_feature(tile)
 
 func _maybe_add_cover(tile: Node3D):
     if rng.randf() > cover_chance:
@@ -101,6 +107,69 @@ func _maybe_add_cover(tile: Node3D):
     )
     obstacle.rotation_degrees.y = rng.randf_range(0, 360)
     tile.add_child(obstacle)
+
+func _maybe_add_vertical_feature(tile: Node3D):
+    if rng.randf() > vertical_feature_chance:
+        return
+    var plateau_height := rng.randf_range(1.4, 3.4)
+    var plateau_size := Vector2(rng.randf_range(2.6, 4.2), rng.randf_range(2.6, 4.2))
+    var platform := StaticBody3D.new()
+    platform.name = "Plateau"
+
+    var mesh_instance := MeshInstance3D.new()
+    var mesh := BoxMesh.new()
+    mesh.size = Vector3(plateau_size.x, 0.5, plateau_size.y)
+    mesh_instance.mesh = mesh
+    var mat := StandardMaterial3D.new()
+    mat.albedo_color = Color(0.2, 0.26, 0.32)
+    mat.roughness = 0.55
+    mesh_instance.material_override = mat
+    platform.add_child(mesh_instance)
+
+    var shape := CollisionShape3D.new()
+    var box_shape := BoxShape3D.new()
+    box_shape.size = mesh.size
+    shape.shape = box_shape
+    shape.position.y = mesh.size.y * 0.5
+    platform.add_child(shape)
+
+    platform.position = Vector3(
+        rng.randf_range(-tile_size * 0.35, tile_size * 0.35),
+        plateau_height,
+        rng.randf_range(-tile_size * 0.35, tile_size * 0.35)
+    )
+    platform.rotation_degrees.y = rng.randf_range(0, 360)
+
+    var ramp := MeshInstance3D.new()
+    var ramp_mesh := PrismMesh.new()
+    ramp_mesh.size = Vector3(plateau_size.x * 0.6, plateau_height, 0.8)
+    ramp.mesh = ramp_mesh
+    var ramp_mat := StandardMaterial3D.new()
+    ramp_mat.albedo_color = Color(0.24, 0.3, 0.36)
+    ramp_mat.roughness = 0.55
+    ramp.material_override = ramp_mat
+    ramp.position = Vector3(0, -plateau_height * 0.5, plateau_size.y * 0.5 + 0.6)
+    ramp.rotation_degrees.x = -90.0
+    platform.add_child(ramp)
+
+    for i in range(3):
+        var stair_mesh := MeshInstance3D.new()
+        var stair_shape := BoxMesh.new()
+        stair_shape.size = Vector3(plateau_size.x * 0.4, plateau_height / 3.0, 0.7)
+        stair_mesh.mesh = stair_shape
+        stair_mesh.position = Vector3(0, -plateau_height * 0.5 + stair_shape.size.y * 0.5 + i * stair_shape.size.y, plateau_size.y * 0.5 + 0.8)
+        stair_mesh.material_override = ramp_mat
+        platform.add_child(stair_mesh)
+
+        var stair_collision := CollisionShape3D.new()
+        var stair_box := BoxShape3D.new()
+        stair_box.size = stair_shape.size
+        stair_collision.shape = stair_box
+        stair_collision.position = stair_mesh.position
+        platform.add_child(stair_collision)
+
+    tile.add_child(platform)
+    floor_positions.append(platform.global_transform.origin + Vector3(0, 0.55, 0))
 
 func spawn_player():
     player = player_scene.instantiate()

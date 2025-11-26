@@ -10,7 +10,10 @@ const DEFAULT_EXPLOSION_SCENE := preload("res://scenes/Explosion.tscn")
 @export var speed := 10.0
 @export var sprint_multiplier := 1.6
 @export var crouch_multiplier := 0.6
-@export var jump_velocity := 4.5
+@export var jump_velocity := 6.2
+@export var acceleration := 18.0
+@export var air_acceleration := 10.0
+@export var friction := 12.0
 @export var slide_speed := 16.0
 @export var slide_duration := 0.55
 @export var step_height := 0.8
@@ -134,6 +137,7 @@ func _physics_process(delta):
     if Input.is_action_just_pressed("crouch") and is_on_floor() and direction.length() > 0.1 and slide_time <= 0.0:
         start_slide(direction)
     var target_speed = speed * (sprint_multiplier if Input.is_action_pressed("sprint") and not is_crouching else 1.0)
+    var acceleration_value := acceleration if is_on_floor() else air_acceleration
     if slide_time > 0.0:
         var slide_ratio = slide_time / slide_duration
         velocity.x = slide_direction.x * slide_speed * slide_ratio
@@ -143,8 +147,12 @@ func _physics_process(delta):
     else:
         if is_crouching:
             target_speed *= crouch_multiplier
-        velocity.x = direction.x * target_speed
-        velocity.z = direction.z * target_speed
+        var target_velocity: Vector3 = direction * target_speed
+        velocity.x = move_toward(velocity.x, target_velocity.x, acceleration_value * delta)
+        velocity.z = move_toward(velocity.z, target_velocity.z, acceleration_value * delta)
+        if direction.length() < 0.1:
+            velocity.x = move_toward(velocity.x, 0.0, friction * delta)
+            velocity.z = move_toward(velocity.z, 0.0, friction * delta)
     apply_step_assist(direction)
     move_and_slide()
     apply_crouch(delta, is_crouching)
@@ -367,6 +375,7 @@ func _apply_weapon_model():
         instance.material_override = mat
         weapon_mesh.add_child(instance)
     var offset: Vector3 = model_data.get("offset", Vector3.ZERO)
+    weapon_mesh.rotation = Vector3.ZERO
     weapon_mesh.position = Vector3(0.24, -0.25, -0.7) + offset
     var scale_mult: float = model_data.get("scale", 0.6)
     weapon_mesh.scale = weapon_base_scale * scale_mult
