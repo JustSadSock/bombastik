@@ -4,6 +4,7 @@ extends CanvasLayer
 @onready var cooldown_bar: TextureProgressBar = $MarginContainer/VBoxContainer/CooldownBar
 @onready var health_bar: TextureProgressBar = $MarginContainer/VBoxContainer/HealthBar
 @onready var crosshair: Label = $Crosshair
+@onready var damage_flash: ColorRect = $DamageFlash
 
 func _ready():
     add_to_group("hud")
@@ -21,3 +22,10 @@ func update_weapon_label(weapons: Array, index: int, cooldown: float):
 func update_health(current: float, max_health: float):
     health_bar.max_value = max_health
     health_bar.value = current
+
+func flash_damage():
+    if damage_flash == null:
+        return
+    damage_flash.modulate.a = 0.6
+    var tween = create_tween()
+    tween.tween_property(damage_flash, "modulate:a", 0.0, 0.4)

@@ -1,0 +1,5 @@
+[gd_resource type="AudioStreamSineWave" format=3]
+
+[resource]
+frequency = 240.0
+volume_db = -6.0

@@ -20,16 +20,17 @@ window/stretch/mode="canvas_items"
 window/stretch/aspect="keep"
 
 [input]
-move_forward={"deadzone":0.1,"events":[{"type":"input_event","id":2,"physical":true,"device":0,"axis":1,"deadzone":0.5,"sensitivity":1.0,"inverted":false}]}
-move_backward={"deadzone":0.1,"events":[{"type":"input_event","id":2,"physical":true,"device":0,"axis":1,"deadzone":0.5,"sensitivity":1.0,"inverted":true}]}
-move_left={"deadzone":0.1,"events":[{"type":"input_event","id":2,"physical":true,"device":0,"axis":0,"deadzone":0.5,"sensitivity":1.0,"inverted":false}]}
-move_right={"deadzone":0.1,"events":[{"type":"input_event","id":2,"physical":true,"device":0,"axis":0,"deadzone":0.5,"sensitivity":1.0,"inverted":true}]}
-jump={"deadzone":0.1,"events":[{"type":"key","scancode":32},{"type":"joy_button","index":0}]}
+move_forward={"deadzone":0.1,"events":[{"type":"key","keycode":87,"physical":true},{"type":"input_event","id":2,"physical":true,"device":0,"axis":1,"deadzone":0.5,"sensitivity":1.0,"inverted":false}]}
+move_backward={"deadzone":0.1,"events":[{"type":"key","keycode":83,"physical":true},{"type":"input_event","id":2,"physical":true,"device":0,"axis":1,"deadzone":0.5,"sensitivity":1.0,"inverted":true}]}
+move_left={"deadzone":0.1,"events":[{"type":"key","keycode":65,"physical":true},{"type":"input_event","id":2,"physical":true,"device":0,"axis":0,"deadzone":0.5,"sensitivity":1.0,"inverted":false}]}
+move_right={"deadzone":0.1,"events":[{"type":"key","keycode":68,"physical":true},{"type":"input_event","id":2,"physical":true,"device":0,"axis":0,"deadzone":0.5,"sensitivity":1.0,"inverted":true}]}
+jump={"deadzone":0.1,"events":[{"type":"key","keycode":32,"physical":true},{"type":"joy_button","index":0}]}
 fire={"deadzone":0.1,"events":[{"type":"mouse_button","index":1}]}
-switch_next={"deadzone":0.1,"events":[{"type":"key","scancode":81}]}
-switch_prev={"deadzone":0.1,"events":[{"type":"key","scancode":69}]}
-sprint={"deadzone":0.1,"events":[{"type":"key","scancode":16777237}]}
-interact={"deadzone":0.1,"events":[{"type":"key","scancode":70}]}
+switch_next={"deadzone":0.1,"events":[{"type":"key","keycode":81,"physical":true}]}
+switch_prev={"deadzone":0.1,"events":[{"type":"key","keycode":69,"physical":true}]}
+sprint={"deadzone":0.1,"events":[{"type":"key","keycode":16777237,"physical":true},{"type":"key","keycode":4194310,"physical":true}]}
+crouch={"deadzone":0.1,"events":[{"type":"key","keycode":16777238,"physical":true},{"type":"key","keycode":67,"physical":true}]}
+interact={"deadzone":0.1,"events":[{"type":"key","keycode":70,"physical":true}]}
 
 [physics]
 common/physics_fps=120

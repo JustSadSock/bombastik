@@ -7,8 +7,12 @@ const DEFAULT_EXPLOSION_SCENE := preload("res://scenes/Explosion.tscn")
 
 @export var speed := 10.0
 @export var sprint_multiplier := 1.6
+@export var crouch_multiplier := 0.6
 @export var jump_velocity := 4.5
 @export var camera_sensitivity := 0.002
+@export var head_bob_speed := 7.5
+@export var head_bob_amount := 0.045
+@export var camera_shake := 0.08
 @export var projectile_scene: PackedScene = DEFAULT_PROJECTILE_SCENE
 @export var explosion_scene: PackedScene = DEFAULT_EXPLOSION_SCENE
 @export var max_health := 100.0
@@ -18,10 +22,18 @@ var current_weapon_index := 0
 var cooldown := 0.0
 var rng := RandomNumberGenerator.new()
 var health := 100.0
+var bob_time := 0.0
+var damage_shake_time := 0.0
+var weapon_rest_position := Vector3.ZERO
 
 @onready var head: Node3D = $Head
 @onready var camera: Camera3D = $Head/Camera3D
 @onready var muzzle: Marker3D = $Head/Muzzle
+@onready var weapon_mesh: MeshInstance3D = $Head/WeaponMesh
+@onready var fire_audio: AudioStreamPlayer3D = $Head/FireAudio
+@onready var hurt_audio: AudioStreamPlayer3D = $Head/HurtAudio
+@onready var step_audio: AudioStreamPlayer3D = $Head/StepAudio
+@onready var collision_shape: CollisionShape3D = $CollisionShape3D
 
 func _ready():
     rng.randomize()
@@ -29,6 +41,7 @@ func _ready():
     projectile_scene = projectile_scene if projectile_scene else DEFAULT_PROJECTILE_SCENE
     explosion_scene = explosion_scene if explosion_scene else DEFAULT_EXPLOSION_SCENE
     Input.set_mouse_mode(Input.MOUSE_MODE_CAPTURED)
+    weapon_rest_position = weapon_mesh.position
     update_hud()
 
 func set_weapons(list: Array):
@@ -49,12 +62,17 @@ func _physics_process(delta):
         velocity.y -= gravity * delta
     var input_dir = Input.get_vector("move_left", "move_right", "move_forward", "move_backward")
     var direction = (transform.basis * Vector3(input_dir.x, 0, input_dir.y)).normalized()
-    var target_speed = speed * (sprint_multiplier if Input.is_action_pressed("sprint") else 1.0)
+    var is_crouching = Input.is_action_pressed("crouch")
+    var target_speed = speed * (sprint_multiplier if Input.is_action_pressed("sprint") and not is_crouching else 1.0)
+    if is_crouching:
+        target_speed *= crouch_multiplier
     velocity.x = direction.x * target_speed
     velocity.z = direction.z * target_speed
     if Input.is_action_just_pressed("jump") and is_on_floor():
         velocity.y = jump_velocity
     move_and_slide()
+    apply_crouch(delta, is_crouching)
+    apply_headbob(delta, direction)
 
 func _process(delta):
     if cooldown > 0.0:
@@ -86,6 +104,9 @@ func shoot():
         var dir = -head.global_transform.basis.z
         dir = (dir + Vector3(rng.randf_range(-spread, spread), rng.randf_range(-spread, spread), rng.randf_range(-spread, spread))).normalized()
         spawn_projectile(dir, data)
+    if fire_audio:
+        fire_audio.play()
+    apply_recoil()
     update_hud()
 
 func spawn_projectile(direction: Vector3, weapon_data: Dictionary):
@@ -119,8 +140,45 @@ func update_hud():
 func take_damage(amount: float):
     health = clamp(health - amount, 0.0, max_health)
     update_hud()
+    damage_shake_time = 0.25
+    if hurt_audio:
+        hurt_audio.play()
+    var hud = get_tree().get_first_node_in_group("hud")
+    if hud and hud.has_method("flash_damage"):
+        hud.flash_damage()
     if health <= 0:
         die()
 
 func die():
     queue_free()
+
+func apply_crouch(delta: float, is_crouching: bool):
+    var target_height = 1.0 if is_crouching else 1.5
+    head.position.y = lerp(head.position.y, target_height, 10.0 * delta)
+    var shape: CapsuleShape3D = collision_shape.shape
+    if shape:
+        shape.height = lerp(shape.height, 1.2 if is_crouching else 1.8, 8.0 * delta)
+
+func apply_headbob(delta: float, direction: Vector3):
+    var horizontal_speed = Vector2(velocity.x, velocity.z).length()
+    if is_on_floor() and horizontal_speed > 0.5:
+        bob_time += delta * head_bob_speed * clamp(horizontal_speed / speed, 0.6, 2.0)
+        var bob_offset = sin(bob_time) * head_bob_amount
+        weapon_mesh.position = weapon_mesh.position.lerp(weapon_rest_position + Vector3(0, bob_offset, 0), 10.0 * delta)
+        weapon_mesh.rotation.z = lerp(weapon_mesh.rotation.z, sin(bob_time * 2.0) * head_bob_amount * 2.5, 8.0 * delta)
+        if step_audio and not step_audio.playing and bob_time % PI < 0.1:
+            step_audio.play()
+    else:
+        bob_time = 0.0
+        weapon_mesh.position = weapon_mesh.position.lerp(weapon_rest_position, 10.0 * delta)
+        weapon_mesh.rotation.z = lerp(weapon_mesh.rotation.z, 0.0, 10.0 * delta)
+
+    if damage_shake_time > 0.0:
+        damage_shake_time = max(0.0, damage_shake_time - delta)
+        var shake_strength = camera_shake * (damage_shake_time / 0.25)
+        camera.translation = Vector3(randf_range(-shake_strength, shake_strength), randf_range(-shake_strength, shake_strength), 0)
+    else:
+        camera.translation = camera.translation.lerp(Vector3.ZERO, 12.0 * delta)
+
+func apply_recoil():
+    head.rotation.x = clamp(head.rotation.x - 0.01, deg_to_rad(-80), deg_to_rad(80))
