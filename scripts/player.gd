@@ -28,6 +28,7 @@ var bob_time := 0.0
 var damage_shake_time := 0.0
 var weapon_rest_position := Vector3.ZERO
 var is_dead := false
+var wants_recap_mouse := true
 
 @onready var head: Node3D = $Head
 @onready var camera: Camera3D = $Head/Camera3D
@@ -60,12 +61,19 @@ func _input(event):
         head.rotate_x(-event.relative.y * camera_sensitivity)
         head.rotation_degrees.x = clamp(head.rotation_degrees.x, -80, 80)
     if event is InputEventMouseButton and event.pressed:
-        Input.set_mouse_mode(Input.MOUSE_MODE_CAPTURED)
+        recapture_mouse()
     if event is InputEventKey and event.pressed and event.keycode == KEY_ESCAPE:
         Input.set_mouse_mode(Input.MOUSE_MODE_VISIBLE)
     if event.is_pressed() and (event.is_action("fire") or event.is_action("jump") or event.is_action("move_forward")
             or event.is_action("move_backward") or event.is_action("move_left") or event.is_action("move_right")):
-        Input.set_mouse_mode(Input.MOUSE_MODE_CAPTURED)
+        recapture_mouse()
+
+func _notification(what):
+    if is_dead:
+        return
+    if what == NOTIFICATION_WM_MOUSE_ENTER or what == NOTIFICATION_APPLICATION_FOCUS_IN:
+        if wants_recap_mouse:
+            recapture_mouse()
 
 func _physics_process(delta):
     if is_dead:
@@ -97,6 +105,10 @@ func _process(delta):
         switch_weapon(-1)
     if Input.is_action_pressed("fire"):
         shoot()
+
+func recapture_mouse():
+    Input.set_mouse_mode(Input.MOUSE_MODE_CAPTURED)
+    wants_recap_mouse = Input.get_mouse_mode() != Input.MOUSE_MODE_CAPTURED
 
 func switch_weapon(step: int):
     if weapons.is_empty():
