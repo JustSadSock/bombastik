@@ -1,14 +1,17 @@
 extends CharacterBody3D
 
+const DEFAULT_EXPLOSION_SCENE := preload("res://scenes/Explosion.tscn")
+
 @export var speed := 6.0
 @export var health := 60.0
 @export var damage := 10.0
-@export var explosion_scene: PackedScene
+@export var explosion_scene: PackedScene = DEFAULT_EXPLOSION_SCENE
 
 var target: Node3D
 
 func _ready():
     add_to_group("enemies")
+    explosion_scene = explosion_scene if explosion_scene else DEFAULT_EXPLOSION_SCENE
 
 func _physics_process(delta):
     if not target:

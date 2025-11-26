@@ -2,12 +2,17 @@ extends Node3D
 
 const WeaponData = preload("res://scripts/weapon_data.gd")
 
+const DEFAULT_TILE_SCENE := preload("res://scenes/LevelTile.tscn")
+const DEFAULT_PLAYER_SCENE := preload("res://scenes/Player.tscn")
+const DEFAULT_ENEMY_SCENE := preload("res://scenes/Enemy.tscn")
+const DEFAULT_PICKUP_SCENE := preload("res://scenes/WeaponPickup.tscn")
+
 @export var grid_size := Vector2i(6, 6)
 @export var tile_size := 12.0
-@export var tile_scene: PackedScene
-@export var player_scene: PackedScene
-@export var enemy_scene: PackedScene
-@export var pickup_scene: PackedScene
+@export var tile_scene: PackedScene = DEFAULT_TILE_SCENE
+@export var player_scene: PackedScene = DEFAULT_PLAYER_SCENE
+@export var enemy_scene: PackedScene = DEFAULT_ENEMY_SCENE
+@export var pickup_scene: PackedScene = DEFAULT_PICKUP_SCENE
 
 var floor_positions: Array = []
 var player: Node3D
@@ -15,6 +20,10 @@ var rng := RandomNumberGenerator.new()
 
 func _ready():
     rng.randomize()
+    tile_scene = tile_scene if tile_scene else DEFAULT_TILE_SCENE
+    player_scene = player_scene if player_scene else DEFAULT_PLAYER_SCENE
+    enemy_scene = enemy_scene if enemy_scene else DEFAULT_ENEMY_SCENE
+    pickup_scene = pickup_scene if pickup_scene else DEFAULT_PICKUP_SCENE
     generate_level()
     spawn_player()
     spawn_pickups()

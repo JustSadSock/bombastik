@@ -2,12 +2,15 @@ extends CharacterBody3D
 
 const GRAVITY = ProjectSettings.get_setting("physics/3d/default_gravity")
 
+const DEFAULT_PROJECTILE_SCENE := preload("res://scenes/Projectile.tscn")
+const DEFAULT_EXPLOSION_SCENE := preload("res://scenes/Explosion.tscn")
+
 @export var speed := 10.0
 @export var sprint_multiplier := 1.6
 @export var jump_velocity := 4.5
 @export var camera_sensitivity := 0.002
-@export var projectile_scene: PackedScene
-@export var explosion_scene: PackedScene
+@export var projectile_scene: PackedScene = DEFAULT_PROJECTILE_SCENE
+@export var explosion_scene: PackedScene = DEFAULT_EXPLOSION_SCENE
 @export var max_health := 100.0
 
 var weapons := []
@@ -23,6 +26,8 @@ var health := 100.0
 func _ready():
     rng.randomize()
     health = max_health
+    projectile_scene = projectile_scene if projectile_scene else DEFAULT_PROJECTILE_SCENE
+    explosion_scene = explosion_scene if explosion_scene else DEFAULT_EXPLOSION_SCENE
     Input.set_mouse_mode(Input.MOUSE_MODE_CAPTURED)
     update_hud()
 
