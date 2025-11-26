@@ -6,18 +6,18 @@
 [ext_resource type="PackedScene" path="res://scenes/Explosion.tscn" id="4"]
 
 [sub_resource type="CapsuleShape3D" id="1"]
-radius = 0.35
-height = 1.6
+radius = 0.55
+height = 1.5
 
 [sub_resource type="BoxMesh" id="2"]
-size = Vector3(0.8, 1.0, 0.6)
+size = Vector3(0.82, 1.2, 0.64)
 
 [sub_resource type="PrismMesh" id="3"]
 size = Vector3(0.2, 0.28, 0.6)
 
 [sub_resource type="CylinderMesh" id="4"]
-height = 0.35
-top_radius = 0.28
+height = 0.42
+top_radius = 0.3
 bottom_radius = 0.35
 
 [sub_resource type="StandardMaterial3D" id="5"]
@@ -46,31 +46,31 @@ mesh = SubResource( 2 )
 material_override = ExtResource( 2 )
 
 [node name="Head" type="MeshInstance3D" parent="Visual"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.05, 0)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.35, 0)
 mesh = SubResource( 4 )
 material_override = ExtResource( 2 )
 
 [node name="Visor" type="MeshInstance3D" parent="Visual"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.96, -0.34)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.24, -0.36)
 mesh = SubResource( 3 )
 material_override = ExtResource( 3 )
 
 [node name="Joints" type="MeshInstance3D" parent="Visual"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.4, 0)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.48, 0)
 mesh = SubResource( 4 )
 material_override = SubResource( 5 )
 
 [node name="Muzzle" type="Marker3D" parent="Visual"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.88, -0.62)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.18, -0.64)
 
 [node name="Glow" type="OmniLight3D" parent="Visual"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.9, 0)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.2, 0)
 range = 7.0
 light_energy = 0.9
-color = Color(0.95, 0.52, 0.26, 1)
+light_color = Color(0.95, 0.52, 0.26, 1)
 
 [node name="HealthLabel" type="Label3D" parent="."]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.75, 0)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 2.3, 0)
 alignment = 1
 billboard = 1
 modulate = Color(1, 0.92, 0.85, 1)

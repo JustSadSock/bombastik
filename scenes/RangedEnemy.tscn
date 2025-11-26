@@ -7,19 +7,19 @@
 [ext_resource type="PackedScene" path="res://scenes/Projectile.tscn" id="5"]
 
 [sub_resource type="CapsuleShape3D" id="1"]
-radius = 0.32
-height = 1.55
+radius = 0.55
+height = 1.5
 
 [sub_resource type="BoxMesh" id="2"]
-size = Vector3(0.7, 0.95, 0.55)
+size = Vector3(0.8, 1.16, 0.58)
 
 [sub_resource type="PrismMesh" id="3"]
 size = Vector3(0.22, 0.24, 0.65)
 
 [sub_resource type="CylinderMesh" id="4"]
-height = 0.3
-top_radius = 0.22
-bottom_radius = 0.28
+height = 0.4
+top_radius = 0.28
+bottom_radius = 0.32
 
 [sub_resource type="StandardMaterial3D" id="5"]
 albedo_color = Color(0.08, 0.1, 0.16, 1)
@@ -53,31 +53,31 @@ mesh = SubResource( 2 )
 material_override = ExtResource( 2 )
 
 [node name="Head" type="MeshInstance3D" parent="Visual"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.05, 0)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.32, 0)
 mesh = SubResource( 4 )
 material_override = ExtResource( 2 )
 
 [node name="Visor" type="MeshInstance3D" parent="Visual"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.95, -0.36)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.22, -0.38)
 mesh = SubResource( 3 )
 material_override = ExtResource( 3 )
 
 [node name="Harness" type="MeshInstance3D" parent="Visual"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.42, 0)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.5, 0)
 mesh = SubResource( 4 )
 material_override = SubResource( 5 )
 
 [node name="Muzzle" type="Marker3D" parent="Visual"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.96, -0.64)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.18, -0.64)
 
 [node name="Glow" type="OmniLight3D" parent="Visual"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.88, 0)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.18, 0)
 range = 8.0
 light_energy = 1.0
-color = Color(0.36, 0.7, 1, 1)
+light_color = Color(0.36, 0.7, 1, 1)
 
 [node name="HealthLabel" type="Label3D" parent="."]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.7, 0)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 2.25, 0)
 alignment = 1
 billboard = 1
 modulate = Color(0.9, 0.95, 1, 1)
