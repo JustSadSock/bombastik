@@ -1,0 +1,26 @@
+[gd_scene load_steps=5 format=3]
+
+[ext_resource type="Script" path="res://scripts/enemy.gd" id="1"]
+[ext_resource type="Material" path="res://materials/enemy_material.tres" id="2"]
+[ext_resource type="PackedScene" path="res://scenes/Explosion.tscn" id="3"]
+
+[sub_resource type="CapsuleShape3D" id="1"]
+
+[sub_resource type="CapsuleMesh" id="2"]
+
+[node name="Enemy" type="CharacterBody3D"]
+script = ExtResource( 1 )
+explosion_scene = ExtResource( 3 )
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="."]
+shape = SubResource( 1 )
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="."]
+mesh = SubResource( 2 )
+material_override = ExtResource( 2 )
+
+[node name="Eye" type="OmniLight3D" parent="."]
+range = 6.0
+light_energy = 0.6
+color = Color(1, 0.2, 0.15, 1)
+

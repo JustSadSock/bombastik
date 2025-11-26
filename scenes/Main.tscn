@@ -1,0 +1,37 @@
+[gd_scene load_steps=8 format=3]
+
+[ext_resource type="Script" path="res://scripts/game.gd" id="1"]
+[ext_resource type="PackedScene" path="res://scenes/LevelTile.tscn" id="2"]
+[ext_resource type="PackedScene" path="res://scenes/Player.tscn" id="3"]
+[ext_resource type="PackedScene" path="res://scenes/Enemy.tscn" id="4"]
+[ext_resource type="PackedScene" path="res://scenes/WeaponPickup.tscn" id="5"]
+[ext_resource type="PackedScene" path="res://scenes/HUD.tscn" id="6"]
+
+[sub_resource type="Sky" id="1"]
+
+[sub_resource type="Environment" id="2"]
+background_mode = 2
+sky = SubResource( 1 )
+
+[node name="Main" type="Node3D"]
+script = ExtResource( 1 )
+tile_scene = ExtResource( 2 )
+player_scene = ExtResource( 3 )
+enemy_scene = ExtResource( 4 )
+pickup_scene = ExtResource( 5 )
+
+[node name="WorldEnvironment" type="WorldEnvironment" parent="."]
+environment = SubResource( 2 )
+
+[node name="Sun" type="DirectionalLight3D" parent="."]
+rotation_degrees = Vector3(-45, 35, 0)
+light_energy = 2.0
+
+[node name="Level" type="Node3D" parent="."]
+
+[node name="Pickups" type="Node3D" parent="."]
+
+[node name="Enemies" type="Node3D" parent="."]
+
+[node name="HUD" parent="." instance=ExtResource( 6 )]
+
