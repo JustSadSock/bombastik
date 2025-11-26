@@ -435,8 +435,8 @@ func _apply_variant_geometry(variant: Dictionary):
         _assign_mesh($Visual/Joints, variant.get("harness_mesh", {}))
     if $Visual.has_node("Harness"):
         _assign_mesh($Visual/Harness, variant.get("harness_mesh", {}))
-    if muzzle:
-        muzzle.position.y = variant.has("muzzle_height") and variant.get("muzzle_height") or muzzle.position.y
+    if muzzle and variant.has("muzzle_height"):
+        muzzle.position.y = variant.get("muzzle_height")
     eye_height = max(1.35, variant.get("eye_height", eye_height * scale_multiplier))
     if hitbox and hitbox.shape is CapsuleShape3D:
         var capsule: CapsuleShape3D = hitbox.shape
