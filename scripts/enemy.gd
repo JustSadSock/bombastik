@@ -3,6 +3,37 @@ extends CharacterBody3D
 const DEFAULT_EXPLOSION_SCENE := preload("res://scenes/Explosion.tscn")
 const DEFAULT_PROJECTILE_SCENE := preload("res://scenes/Projectile.tscn")
 
+var gravity: float = ProjectSettings.get_setting("physics/3d/default_gravity")
+const VARIANT_STYLES := [
+    {
+        "body": Color(0.85, 0.48, 0.4),
+        "accent": Color(1.0, 0.72, 0.42),
+        "light": Color(1.05, 0.64, 0.48),
+        "attachments": [
+            {"type": "blade", "offset": Vector3(0.42, 0.4, 0.0)},
+            {"type": "pauldron", "offset": Vector3(-0.44, 0.52, 0.0)},
+        ],
+    },
+    {
+        "body": Color(0.42, 0.6, 1.0),
+        "accent": Color(0.3, 0.86, 0.9),
+        "light": Color(0.42, 0.8, 1.0),
+        "attachments": [
+            {"type": "antenna", "offset": Vector3(0.18, 1.05, -0.16)},
+            {"type": "backpack", "offset": Vector3(0.0, 0.38, 0.34)},
+        ],
+    },
+    {
+        "body": Color(0.68, 0.48, 0.9),
+        "accent": Color(1.0, 0.56, 0.86),
+        "light": Color(1.1, 0.68, 1.0),
+        "attachments": [
+            {"type": "visor_ridge", "offset": Vector3(0.0, 0.92, -0.34)},
+            {"type": "shoulder_plate", "offset": Vector3(0.44, 0.48, 0.0)},
+        ],
+    },
+]
+
 @export_enum("melee", "ranged") var attack_type := "melee"
 @export var speed := 6.0
 @export var strafe_speed := 4.5
@@ -31,17 +62,27 @@ var stagger_timer := 0.0
 var is_attacking := false
 var is_dead := false
 var base_visual_height := 0.0
+var strafe_jitter := Vector3.ZERO
+var jitter_timer := 0.0
+var rng := RandomNumberGenerator.new()
 
 @onready var visual: Node3D = $Visual
 @onready var health_label: Label3D = $HealthLabel
 @onready var muzzle: Marker3D = $Visual/Muzzle
 @onready var hitbox: CollisionShape3D = $CollisionShape3D
+@onready var glow: OmniLight3D = $Visual/Glow
+@onready var body_mesh: MeshInstance3D = $Visual/Body
+@onready var head_mesh: MeshInstance3D = $Visual/Head
+@onready var accent_meshes: Array = [$Visual/Visor, $Visual.get_node_or_null("Joints"), $Visual.get_node_or_null("Harness")]
 
 func _ready():
     add_to_group("enemies")
+    rng.randomize()
+    floor_snap_length = max(floor_snap_length, 0.6)
     explosion_scene = explosion_scene if explosion_scene else DEFAULT_EXPLOSION_SCENE
     projectile_scene = projectile_scene if projectile_scene else DEFAULT_PROJECTILE_SCENE
     base_visual_height = visual.position.y
+    _apply_variant_style()
     update_health_label()
 
 func _physics_process(delta):
@@ -53,11 +94,17 @@ func _physics_process(delta):
 
     cooldown_timer = max(0.0, cooldown_timer - delta)
     stagger_timer = max(0.0, stagger_timer - delta)
+    jitter_timer = max(0.0, jitter_timer - delta)
 
     var to_target = (target.global_transform.origin - global_transform.origin)
     var dir = to_target.normalized()
     var distance = to_target.length()
     look_at(target.global_transform.origin, Vector3.UP)
+
+    if not is_on_floor():
+        velocity.y = max(velocity.y - gravity * delta, -25.0)
+    else:
+        velocity.y = -4.0
 
     if is_attacking:
         attack_timer -= delta
@@ -82,6 +129,11 @@ func _physics_process(delta):
             _start_attack()
 
 func _choose_movement(dir: Vector3, distance: float):
+    if jitter_timer <= 0.0:
+        jitter_timer = rng.randf_range(0.7, 1.4)
+        var lateral := Vector3(-dir.z, 0, dir.x) * rng.randf_range(-0.9, 0.9)
+        strafe_jitter = lateral.normalized() * rng.randf_range(0.4, 1.0)
+
     if attack_type == "ranged":
         var desired_dir = dir
         var speed_scale := 1.0
@@ -92,15 +144,18 @@ func _choose_movement(dir: Vector3, distance: float):
             desired_dir = dir
             speed_scale = 1.0
         else:
-            desired_dir = (dir + Vector3(-dir.z, 0, dir.x) * 0.5).normalized()
-            speed_scale = 0.7
-        velocity = desired_dir * strafe_speed * speed_scale
+            desired_dir = (dir + strafe_jitter).normalized()
+            speed_scale = 0.85
+        velocity.x = desired_dir.x * strafe_speed * speed_scale
+        velocity.z = desired_dir.z * strafe_speed * speed_scale
     else:
-        velocity = dir * speed
+        var angled := (dir + strafe_jitter * 0.6).normalized()
+        velocity.x = angled.x * speed
+        velocity.z = angled.z * speed * 1.05
 
 func _idle_sway(delta: float):
     var sway := sin(Time.get_ticks_msec() / 1000.0 * idle_sway_speed) * idle_sway_amount
-    visual.position.y = lerp(visual.position.y, base_visual_height + sway + eye_height, 6.0 * delta)
+    visual.position.y = lerp(visual.position.y, base_visual_height + sway, 8.0 * delta)
 
 func _start_attack():
     is_attacking = true
@@ -121,15 +176,22 @@ func _animate_attack_windup():
     if not visual:
         return
     var tween := create_tween()
-    tween.tween_property(visual, "rotation_degrees:x", -12.0, attack_windup * 0.8).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
-    tween.tween_property(visual, "rotation_degrees:x", 0.0, attack_windup * 0.2).set_trans(Tween.TRANS_LINEAR)
+    var dip := -16.0 if attack_type == "melee" else -9.0
+    tween.tween_property(visual, "rotation_degrees:x", dip, attack_windup * 0.7).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+    tween.tween_property(visual, "rotation_degrees:x", 0.0, attack_windup * 0.3).set_trans(Tween.TRANS_LINEAR)
 
 func _animate_attack_release():
     if not visual:
         return
     var tween := create_tween()
-    tween.tween_property(visual, "rotation_degrees:x", 10.0, 0.2).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
-    tween.tween_property(visual, "rotation_degrees:x", 0.0, 0.25).set_trans(Tween.TRANS_LINEAR)
+    if attack_type == "melee":
+        tween.tween_property(visual, "position:z", visual.position.z - 0.32, 0.18).set_trans(Tween.TRANS_QUAD)
+        tween.parallel().tween_property(visual, "rotation_degrees:x", 12.0, 0.2).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+    else:
+        tween.tween_property(visual, "rotation_degrees:z", rng.randf_range(-6.0, 6.0), 0.18).set_trans(Tween.TRANS_CUBIC)
+        tween.parallel().tween_property(visual, "rotation_degrees:x", 7.0, 0.2).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+    tween.tween_property(visual, "rotation_degrees", Vector3.ZERO, 0.28).set_trans(Tween.TRANS_LINEAR)
+    tween.parallel().tween_property(visual, "position:z", 0.0, 0.2).set_trans(Tween.TRANS_SINE)
 
 func _fire_projectile(dir: Vector3):
     if projectile_scene == null:
@@ -201,3 +263,77 @@ func _animate_death():
     tween.tween_property(visual, "rotation_degrees:z", 30.0, death_fade_time * 0.4).set_trans(Tween.TRANS_BACK)
     tween.tween_property(visual, "position:y", visual.position.y - 0.8, death_fade_time * 0.6).set_trans(Tween.TRANS_SINE)
     tween.parallel().tween_property(visual, "modulate:a", 0.0, death_fade_time).set_ease(Tween.EASE_IN)
+
+func _apply_variant_style():
+    var style = VARIANT_STYLES[rng.randi_range(0, VARIANT_STYLES.size() - 1)]
+    _tint_mesh(body_mesh, style.get("body", Color.WHITE))
+    _tint_mesh(head_mesh, style.get("body", Color.WHITE))
+    for mesh in accent_meshes:
+        if mesh:
+            _tint_mesh(mesh, style.get("accent", mesh.modulate))
+    if glow:
+        glow.color = style.get("light", glow.color)
+        glow.light_energy = 1.0 + rng.randf_range(-0.1, 0.3)
+    _spawn_attachments(style.get("attachments", []), style.get("accent", Color(0.9, 0.9, 0.9)))
+
+func _tint_mesh(mesh: MeshInstance3D, color: Color):
+    if not mesh:
+        return
+    mesh.modulate = color
+    if mesh.material_override:
+        var mat := mesh.material_override.duplicate()
+        if mat is BaseMaterial3D:
+            mat.albedo_color = color
+            mat.emission_enabled = true
+            mat.emission = color * 0.35
+        mesh.material_override = mat
+
+func _spawn_attachments(attachments: Array, accent: Color):
+    for data in attachments:
+        if not data is Dictionary:
+            continue
+        var mesh_instance := MeshInstance3D.new()
+        mesh_instance.mesh = _build_attachment_mesh(data.get("type", ""))
+        mesh_instance.material_override = StandardMaterial3D.new()
+        mesh_instance.material_override.albedo_color = accent
+        mesh_instance.material_override.emission_enabled = true
+        mesh_instance.material_override.emission = accent * 0.4
+        mesh_instance.position = data.get("offset", Vector3.ZERO)
+        mesh_instance.rotation_degrees = Vector3(rng.randf_range(-8, 8), rng.randf_range(0, 360), rng.randf_range(-8, 8))
+        if mesh_instance.mesh:
+            visual.add_child(mesh_instance)
+
+func _build_attachment_mesh(kind: String) -> Mesh:
+    match kind:
+        "blade":
+            var prism := PrismMesh.new()
+            prism.size = Vector3(0.16, 0.16, 0.8)
+            return prism
+        "pauldron":
+            var box := BoxMesh.new()
+            box.size = Vector3(0.44, 0.32, 0.4)
+            return box
+        "antenna":
+            var cylinder := CylinderMesh.new()
+            cylinder.height = 0.5
+            cylinder.top_radius = 0.05
+            cylinder.bottom_radius = 0.07
+            return cylinder
+        "backpack":
+            var box2 := BoxMesh.new()
+            box2.size = Vector3(0.48, 0.56, 0.3)
+            return box2
+        "visor_ridge":
+            var ridge := PrismMesh.new()
+            ridge.size = Vector3(0.38, 0.18, 0.5)
+            return ridge
+        "shoulder_plate":
+            var plate := CylinderMesh.new()
+            plate.height = 0.32
+            plate.top_radius = 0.32
+            plate.bottom_radius = 0.36
+            return plate
+        _:
+            var default_box := BoxMesh.new()
+            default_box.size = Vector3(0.28, 0.28, 0.28)
+            return default_box

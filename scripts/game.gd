@@ -8,8 +8,8 @@ const DEFAULT_ENEMY_SCENE := preload("res://scenes/Enemy.tscn")
 const DEFAULT_RANGED_ENEMY_SCENE := preload("res://scenes/RangedEnemy.tscn")
 const DEFAULT_PICKUP_SCENE := preload("res://scenes/WeaponPickup.tscn")
 
-@export var grid_size := Vector2i(10, 10)
-@export var tile_size := 6.0
+@export var grid_size := Vector2i(14, 14)
+@export var tile_size := 6.5
 @export var tile_height_variation := 0.45
 @export var cover_chance := 0.18
 @export var tile_scene: PackedScene = DEFAULT_TILE_SCENE

@@ -32,6 +32,7 @@ var health := 100.0
 var bob_time := 0.0
 var damage_shake_time := 0.0
 var weapon_rest_position := Vector3.ZERO
+var weapon_fire_tween: Tween
 var is_dead := false
 var wants_recap_mouse := true
 var force_move_input := Vector2.ZERO
@@ -108,6 +109,9 @@ func _physics_process(delta):
         coyote_timer = max(0.0, coyote_timer - delta)
     else:
         coyote_timer = coyote_time
+    if Input.is_action_just_pressed("jump") and (is_on_floor() or coyote_timer > 0.0):
+        velocity.y = jump_velocity
+        coyote_timer = 0.0
     var input_dir = Input.get_vector("move_left", "move_right", "move_forward", "move_backward")
     if input_dir == Vector2.ZERO and force_move_input != Vector2.ZERO:
         input_dir = force_move_input.normalized()
@@ -199,6 +203,7 @@ func shoot():
     if fire_audio:
         fire_audio.play()
     apply_recoil()
+    animate_weapon_fire(data)
     update_hud()
 
 func spawn_projectile(direction: Vector3, weapon_data: Dictionary):
@@ -212,6 +217,7 @@ func spawn_projectile(direction: Vector3, weapon_data: Dictionary):
     projectile.set("explosive", weapon_data.get("explosive", false))
     projectile.set("explosion_scene", explosion_scene)
     projectile.set("creator", self)
+    projectile.set("tint", weapon_data.get("projectile_color", Color(1.0, 0.9, 0.7)))
     projectile.scale = Vector3.ONE * weapon_data.get("projectile_scale", 0.2)
     get_tree().current_scene.add_child(projectile)
 
@@ -299,6 +305,32 @@ func apply_headbob(delta: float, _direction: Vector3):
 
 func apply_recoil():
     head.rotation.x = clamp(head.rotation.x - 0.006, deg_to_rad(-80), deg_to_rad(80))
+
+func animate_weapon_fire(data: Dictionary):
+    if not weapon_mesh:
+        return
+    if weapon_fire_tween:
+        weapon_fire_tween.kill()
+    weapon_fire_tween = create_tween()
+    var style: String = data.get("fire_style", "pistol")
+    match style:
+        "burst":
+            weapon_fire_tween.tween_property(weapon_mesh, "position:z", weapon_rest_position.z - 0.06, 0.06).set_trans(Tween.TRANS_BACK)
+            weapon_fire_tween.parallel().tween_property(weapon_mesh, "rotation_degrees:y", -8.0, 0.05)
+        "kick":
+            weapon_fire_tween.tween_property(weapon_mesh, "position", weapon_rest_position + Vector3(0.02, -0.06, -0.1), 0.08).set_trans(Tween.TRANS_BACK)
+            weapon_fire_tween.parallel().tween_property(weapon_mesh, "rotation_degrees:x", -10.0, 0.08)
+        "heavy":
+            weapon_fire_tween.tween_property(weapon_mesh, "position", weapon_rest_position + Vector3(-0.02, -0.04, -0.12), 0.12).set_trans(Tween.TRANS_SINE)
+            weapon_fire_tween.parallel().tween_property(weapon_mesh, "rotation_degrees:z", 6.0, 0.12)
+        "beam":
+            weapon_fire_tween.tween_property(weapon_mesh, "position", weapon_rest_position + Vector3(0.0, 0.02, -0.04), 0.05).set_trans(Tween.TRANS_SINE)
+            weapon_fire_tween.parallel().tween_property(weapon_mesh, "rotation_degrees:z", 4.0, 0.06)
+        _:
+            weapon_fire_tween.tween_property(weapon_mesh, "position:z", weapon_rest_position.z - 0.04, 0.05).set_trans(Tween.TRANS_BACK)
+            weapon_fire_tween.parallel().tween_property(weapon_mesh, "rotation_degrees:x", -6.0, 0.06)
+    weapon_fire_tween.tween_property(weapon_mesh, "position", weapon_rest_position, 0.12).set_trans(Tween.TRANS_SINE)
+    weapon_fire_tween.parallel().tween_property(weapon_mesh, "rotation_degrees", Vector3.ZERO, 0.12).set_trans(Tween.TRANS_SINE)
 
 func start_slide(direction: Vector3):
     slide_direction = direction.normalized()
