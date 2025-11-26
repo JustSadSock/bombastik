@@ -4,7 +4,7 @@ signal restart_requested
 
 @onready var weapon_label: Label = $MarginContainer/VBoxContainer/WeaponLabel
 @onready var cooldown_bar: ProgressBar = $MarginContainer/VBoxContainer/CooldownBar
-@onready var health_bar: ProgressBar = $MarginContainer/VBoxContainer/HealthBar
+@onready var health_bar: ProgressBar = $MarginContainer/VBoxContainer/HealthContainer/HealthBar
 @onready var health_value: Label = $MarginContainer/VBoxContainer/HealthContainer/HealthValue
 @onready var crosshair: Label = $Crosshair
 @onready var damage_flash: ColorRect = $DamageFlash
