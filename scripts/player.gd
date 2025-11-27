@@ -6,6 +6,7 @@ var gravity: float = ProjectSettings.get_setting("physics/3d/default_gravity") *
 
 const DEFAULT_PROJECTILE_SCENE := preload("res://scenes/Projectile.tscn")
 const DEFAULT_EXPLOSION_SCENE := preload("res://scenes/Explosion.tscn")
+const AudioFactory := preload("res://scripts/audio_factory.gd")
 
 @export var speed := 15.0
 @export var sprint_multiplier := 1.9
@@ -595,56 +596,32 @@ func apply_settings(settings: Dictionary):
 func _ensure_sounds():
     if sound_assets_generated:
         return
-    if fire_audio:
-        fire_audio.stream = _build_tone(520.0, 0.12, 0.65)
-    if hurt_audio:
-        hurt_audio.stream = _build_tone(200.0, 0.2, 0.55)
-    if step_audio:
-        step_audio.stream = _build_tone(140.0, 0.08, 0.4)
-    if jump_audio:
-        jump_audio.stream = _build_tone(440.0, 0.18, 0.48)
-    if land_audio:
-        land_audio.stream = _build_tone(260.0, 0.2, 0.5)
-    if slide_audio:
-        slide_audio.stream = _build_tone(190.0, 0.22, 0.42)
-    if swap_audio:
-        swap_audio.stream = _build_tone(360.0, 0.16, 0.4)
+    _configure_sound(fire_audio, AudioFactory.player_fire(), 520.0, 0.65, -5.0)
+    _configure_sound(hurt_audio, AudioFactory.player_hurt(), 200.0, 0.55, -6.0)
+    _configure_sound(step_audio, AudioFactory.player_step(), 140.0, 0.4, -10.0)
+    _configure_sound(jump_audio, AudioFactory.player_jump(), 520.0, 0.48, -8.0)
+    _configure_sound(land_audio, AudioFactory.player_land(), 240.0, 0.5, -8.0)
+    _configure_sound(slide_audio, AudioFactory.player_slide(), 180.0, 0.42, -8.0)
+    _configure_sound(swap_audio, AudioFactory.player_swap(), 360.0, 0.4, -10.0)
     sound_assets_generated = true
 
-func _play_sound(player: AudioStreamPlayer3D, freq: float, duration: float, amplitude: float):
+func _configure_sound(player: AudioStreamPlayer3D, stream: AudioStream, base_freq: float, base_amp: float, base_db: float):
     if not player:
         return
-    if not player.stream:
-        player.stream = _build_tone(freq, duration, amplitude)
-    if not player.playing:
-        player.play()
-    var playback = player.get_stream_playback()
-    if playback is AudioStreamGeneratorPlayback:
-        _fill_generator(playback, freq, duration, amplitude)
-    else:
-        player.stop()
-        player.play()
+    player.stream = stream
+    player.set_meta("base_freq", base_freq)
+    player.set_meta("base_amp", base_amp)
+    player.set_meta("base_db", base_db)
+    player.volume_db = base_db
 
-func _build_tone(freq: float, duration: float, amplitude: float) -> AudioStream:
-    var sample := AudioStreamWAV.new()
-    sample.mix_rate = 44100
-    sample.format = AudioStreamWAV.FORMAT_16_BITS
-    sample.stereo = false
-    sample.loop_mode = AudioStreamWAV.LOOP_DISABLED
-    var length := int(duration * sample.mix_rate)
-    var data := PackedByteArray()
-    data.resize(length * 2)
-    for i in length:
-        var t = float(i) / sample.mix_rate
-        var value = sin(TAU * freq * t) * amplitude
-        data.encode_s16(i * 2, int(clamp(value, -1.0, 1.0) * 32767))
-    sample.data = data
-    return sample
-
-func _fill_generator(playback: AudioStreamGeneratorPlayback, freq: float, duration: float, amplitude: float):
-    var sample_rate = playback.get_stream().mix_rate
-    var frame_count = int(duration * sample_rate)
-    for i in frame_count:
-        var t = float(i) / sample_rate
-        var sample = sin(TAU * freq * t) * amplitude
-        playback.push_frame(Vector2(sample, sample))
+func _play_sound(player: AudioStreamPlayer3D, freq: float, _duration: float, amplitude: float):
+    if not player or not player.stream:
+        return
+    var base_freq: float = player.get_meta("base_freq", freq)
+    var base_amp: float = player.get_meta("base_amp", amplitude)
+    var base_db: float = player.get_meta("base_db", player.volume_db)
+    player.pitch_scale = clamp(freq / max(1.0, base_freq), 0.6, 2.2)
+    var amp_ratio: float = clamp(amplitude / max(0.01, base_amp), 0.35, 2.0)
+    player.volume_db = base_db + linear_to_db(amp_ratio)
+    player.stop()
+    player.play()
