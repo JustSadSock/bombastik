@@ -11,9 +11,9 @@ const DEFAULT_EXPLOSION_SCENE := preload("res://scenes/Explosion.tscn")
 @export var sprint_multiplier := 1.9
 @export var crouch_multiplier := 0.6
 @export var jump_velocity := 7.4
-@export var acceleration := 42.0
-@export var air_acceleration := 22.0
-@export var friction := 18.0
+@export var acceleration := 56.0
+@export var air_acceleration := 24.0
+@export var friction := 26.0
 @export var slide_speed := 22.0
 @export var slide_duration := 0.48
 @export var step_height := 0.8
@@ -178,7 +178,15 @@ func _physics_process(delta):
         var performing_wall_jump := wall_running and not is_on_floor()
         if performing_wall_jump:
             wall_run_time = 0.0
-            var wall_boost := wall_run_normal * wall_jump_push
+            var view_dir := -head.global_transform.basis.z
+            var planar_view := Vector3(view_dir.x, 0.0, view_dir.z)
+            if planar_view.length() < 0.05:
+                var backup_dir := transform.basis * Vector3.FORWARD
+                planar_view = Vector3(backup_dir.x, 0.0, backup_dir.z)
+            planar_view = planar_view.normalized()
+            var away_boost := wall_run_normal * 0.65
+            var jump_dir := (planar_view + away_boost).normalized()
+            var wall_boost := jump_dir * wall_jump_push
             velocity += wall_boost
             velocity.y = min(velocity.y, jump_velocity * 0.2)
         else:
