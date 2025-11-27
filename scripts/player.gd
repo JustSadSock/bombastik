@@ -2,7 +2,7 @@ extends CharacterBody3D
 
 signal died
 
-var gravity: float = ProjectSettings.get_setting("physics/3d/default_gravity")
+var gravity: float = ProjectSettings.get_setting("physics/3d/default_gravity") * 1.18
 
 const DEFAULT_PROJECTILE_SCENE := preload("res://scenes/Projectile.tscn")
 const DEFAULT_EXPLOSION_SCENE := preload("res://scenes/Explosion.tscn")
@@ -27,6 +27,7 @@ const DEFAULT_EXPLOSION_SCENE := preload("res://scenes/Explosion.tscn")
 @export var wall_run_drop_speed := -8.0
 @export var wall_run_extra_drop := 6.0
 @export var wall_run_tilt_speed := 8.0
+@export var wall_jump_push := 11.0
 @export var head_bob_speed := 6.0
 @export var head_bob_amount := 0.02
 @export var camera_shake := 0.035
@@ -174,7 +175,14 @@ func _physics_process(delta):
     jump_buffer_time = max(0.0, jump_buffer_time - delta)
 
     if jump_buffer_time > 0.0 and (is_on_floor() or coyote_timer > 0.0 or jumps_used < MAX_JUMPS):
-        velocity.y = jump_velocity
+        var performing_wall_jump := wall_running and not is_on_floor()
+        if performing_wall_jump:
+            wall_run_time = 0.0
+            var wall_boost := wall_run_normal * wall_jump_push
+            velocity += wall_boost
+            velocity.y = min(velocity.y, jump_velocity * 0.2)
+        else:
+            velocity.y = jump_velocity
         coyote_timer = 0.0
         jumps_used += 1
         jump_buffer_time = 0.0
