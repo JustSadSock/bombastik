@@ -28,12 +28,15 @@ var height_range := Vector2.ZERO
 var player: Node3D
 var rng := RandomNumberGenerator.new()
 var game_over := false
+var hazard_prefabs := {}
 var height_noise := FastNoiseLite.new()
 var menu_controller: Node
 var pending_settings := {
     "sensitivity": 0.002,
     "master_volume": 1.0,
 }
+var particle_pool := {}
+var pool_root: Node3D
 
 @onready var level_root: Node3D = $Level
 @onready var pickup_root: Node3D = $Pickups
@@ -46,6 +49,9 @@ func _ready():
     height_noise.seed = randi()
     height_noise.frequency = 0.07
     height_noise.fractal_octaves = 3
+    pool_root = Node3D.new()
+    pool_root.name = "Pool"
+    add_child(pool_root)
     _ensure_default_input()
     player_scene = player_scene if player_scene else DEFAULT_PLAYER_SCENE
     enemy_scene = enemy_scene if enemy_scene else DEFAULT_ENEMY_SCENE
@@ -117,6 +123,33 @@ func _add_light_flicker(light: Light3D, base_energy: float, variance: float, per
     flicker.tween_property(light, "light_energy", base_energy + variance, period * rng.randf_range(0.45, 0.8)).set_trans(Tween.TRANS_SINE)
     flicker.tween_property(light, "light_energy", base_energy - variance * 0.6, period * rng.randf_range(0.45, 0.8)).set_trans(Tween.TRANS_SINE)
 
+func _cache_prefab(key: String, root: Node3D):
+    var prefab := PackedScene.new()
+    if prefab.pack(root) == OK:
+        hazard_prefabs[key] = prefab
+
+func _stash_pooled_particles(node: CPUParticles3D):
+    var key: String = node.get_meta("pool_key", "")
+    if key.is_empty():
+        node.queue_free()
+        return
+    if not particle_pool.has(key):
+        particle_pool[key] = []
+    node.emitting = false
+    node.visible = false
+    node.reparent(pool_root)
+    particle_pool[key].append(node)
+
+func _get_pooled_particles(key: String, builder: Callable) -> CPUParticles3D:
+    var stash: Array = particle_pool.get(key, [])
+    if not stash.is_empty():
+        var node: CPUParticles3D = stash.pop_back()
+        node.visible = true
+        return node
+    var created: CPUParticles3D = builder.call()
+    created.set_meta("pool_key", key)
+    return created
+
 func start_round():
     game_over = false
     get_tree().paused = false
@@ -136,7 +169,10 @@ func clear_game():
     spawn_positions.clear()
     height_map.clear()
     for child in level_root.get_children():
-        child.queue_free()
+        if child is CPUParticles3D:
+            _stash_pooled_particles(child)
+        else:
+            child.queue_free()
     for child in pickup_root.get_children():
         child.queue_free()
     for child in enemy_root.get_children():
@@ -209,11 +245,15 @@ func _build_factory_blockout():
         {"name": "CentralAtrium", "center": Vector3(playfield.x * 0.5, 0, playfield.y * 0.54), "size": Vector2(34, 26)},
     ]
 
+    var walkable_regions: Array = []
+    var nav_blockers: Array = []
+
     for hall in halls:
         _create_floor_plate(hall["name"], hall["size"], hall["center"], floor_material, 0.55)
         _register_zone_positions(hall["center"], hall["size"], 4)
         _decorate_hall_edges(hall["center"], hall["size"], accent_material)
         _scatter_supports(hall["center"], hall["size"], 2, secondary_material)
+        walkable_regions.append(_rect_from_center_size(hall["center"], hall["size"]))
 
     var corridors := [
         {"name": "CentralSpine", "center": Vector3(playfield.x * 0.5, 0, playfield.y * 0.55), "size": Vector2(78, 10)},
@@ -225,12 +265,43 @@ func _build_factory_blockout():
 
     for corridor in corridors:
         _build_corridor(corridor, floor_material, accent_material)
+        walkable_regions.append(_rect_from_center_size(corridor["center"], corridor["size"]))
 
-    _add_conveyor_accelerators(playfield, accent_material, secondary_material)
-    _add_press_lanes(playfield, accent_material)
-    _add_robotic_arm_rails(playfield, accent_material)
-    _add_updraft_furnaces(playfield, accent_material, secondary_material)
+    var conveyor_defs := [
+        {"name": "AssemblyBelt", "center": Vector3(playfield.x * 0.26, 0.05, playfield.y * 0.3), "size": Vector2(22, 6), "dir": Vector3(1, 0, 0), "speed": 26.0},
+        {"name": "SmelterBelt", "center": Vector3(playfield.x * 0.72, 0.05, playfield.y * 0.32), "size": Vector2(20, 6), "dir": Vector3(-1, 0, 0), "speed": 22.0},
+        {"name": "AtriumLoop", "center": Vector3(playfield.x * 0.5, 0.05, playfield.y * 0.54), "size": Vector2(14, 8), "dir": Vector3(0, 0, -1), "speed": 18.0, "damage": 6.0},
+    ]
+
+    var press_defs := [
+        {"name": "AtriumPress", "center": Vector3(playfield.x * 0.5, 0, playfield.y * 0.6), "size": Vector2(8, 8), "depth": 2.4, "cycle": 1.6},
+        {"name": "ShippingPress", "center": Vector3(playfield.x * 0.3, 0, playfield.y * 0.78), "size": Vector2(6, 8), "depth": 2.0, "cycle": 1.9},
+        {"name": "CoolingPress", "center": Vector3(playfield.x * 0.74, 0, playfield.y * 0.74), "size": Vector2(6, 6), "depth": 1.8, "cycle": 1.7},
+    ]
+
+    var arm_defs := [
+        {"name": "NorthArm", "start": Vector3(playfield.x * 0.3, 1.2, playfield.y * 0.22), "end": Vector3(playfield.x * 0.7, 1.2, playfield.y * 0.22), "lift": 8.0},
+        {"name": "CentralArm", "start": Vector3(playfield.x * 0.22, 1.4, playfield.y * 0.52), "end": Vector3(playfield.x * 0.22, 1.4, playfield.y * 0.86), "lift": 7.2},
+        {"name": "SouthArm", "start": Vector3(playfield.x * 0.58, 1.2, playfield.y * 0.82), "end": Vector3(playfield.x * 0.82, 1.2, playfield.y * 0.64), "lift": 9.0},
+    ]
+
+    var furnace_defs := [
+        {"name": "SmelterUpdraft", "center": Vector3(playfield.x * 0.72, 0, playfield.y * 0.42), "radius": 2.4, "height": 10.0, "force": 22.0},
+        {"name": "AssemblyUpdraft", "center": Vector3(playfield.x * 0.24, 0, playfield.y * 0.38), "radius": 2.2, "height": 9.0, "force": 19.0},
+        {"name": "CoolingUpdraft", "center": Vector3(playfield.x * 0.64, 0, playfield.y * 0.64), "radius": 2.6, "height": 11.0, "force": 24.0},
+    ]
+
+    for press_def in press_defs:
+        nav_blockers.append(_rect_from_center_size(press_def["center"], press_def["size"] * 0.9))
+    for furnace_def in furnace_defs:
+        nav_blockers.append(_rect_from_center_size(furnace_def["center"], Vector2(furnace_def["radius"] * 2.0, furnace_def["radius"] * 1.8)))
+
+    _add_conveyor_accelerators(playfield, accent_material, secondary_material, conveyor_defs)
+    _add_press_lanes(playfield, accent_material, press_defs)
+    _add_robotic_arm_rails(playfield, accent_material, arm_defs)
+    _add_updraft_furnaces(playfield, accent_material, secondary_material, furnace_defs)
     _add_factory_fx(playfield)
+    _build_navigation_layout(walkable_regions, nav_blockers)
 
 func _make_factory_floor_material() -> StandardMaterial3D:
     var mat := StandardMaterial3D.new()
@@ -322,13 +393,7 @@ func _add_corridor_guardrails(center: Vector3, size: Vector2, material: Standard
         level_root.add_child(light)
 
 
-func _add_conveyor_accelerators(playfield: Vector2, accent_material: StandardMaterial3D, tread_material: StandardMaterial3D):
-    var conveyor_defs := [
-        {"name": "AssemblyBelt", "center": Vector3(playfield.x * 0.26, 0.05, playfield.y * 0.3), "size": Vector2(22, 6), "dir": Vector3(1, 0, 0), "speed": 26.0},
-        {"name": "SmelterBelt", "center": Vector3(playfield.x * 0.72, 0.05, playfield.y * 0.32), "size": Vector2(20, 6), "dir": Vector3(-1, 0, 0), "speed": 22.0},
-        {"name": "AtriumLoop", "center": Vector3(playfield.x * 0.5, 0.05, playfield.y * 0.54), "size": Vector2(14, 8), "dir": Vector3(0, 0, -1), "speed": 18.0},
-    ]
-
+func _add_conveyor_accelerators(playfield: Vector2, accent_material: StandardMaterial3D, tread_material: StandardMaterial3D, conveyor_defs: Array):
     for def in conveyor_defs:
         _create_conveyor_belt(def, accent_material, tread_material)
 
@@ -338,6 +403,7 @@ func _create_conveyor_belt(def: Dictionary, accent_material: StandardMaterial3D,
     var size: Vector2 = def.get("size", Vector2(18, 6))
     var direction: Vector3 = def.get("dir", Vector3.FORWARD)
     var speed: float = def.get("speed", 18.0)
+    var damage: float = def.get("damage", 0.0)
 
     var root := Node3D.new()
     root.name = name
@@ -350,6 +416,9 @@ func _create_conveyor_belt(def: Dictionary, accent_material: StandardMaterial3D,
     base_instance.mesh = base_mesh
     base_instance.material_override = accent_material
     base_instance.position = Vector3.ZERO
+    base_instance.visibility_range_begin = 10.0
+    base_instance.visibility_range_end = 160.0
+    base_instance.visibility_range_fade_mode = GeometryInstance3D.VISIBILITY_RANGE_FADE_DEPENDENCIES
     base.add_child(base_instance)
 
     var base_collision := CollisionShape3D.new()
@@ -373,6 +442,9 @@ func _create_conveyor_belt(def: Dictionary, accent_material: StandardMaterial3D,
     tread_mat.emission_energy_multiplier = 1.4
     tread.material_override = tread_mat
     tread.position = Vector3(0, 0.28, 0)
+    tread.visibility_range_begin = 10.0
+    tread.visibility_range_end = 150.0
+    tread.visibility_range_fade_mode = GeometryInstance3D.VISIBILITY_RANGE_FADE_DEPENDENCIES
     root.add_child(tread)
 
     var arrow := MeshInstance3D.new()
@@ -382,6 +454,8 @@ func _create_conveyor_belt(def: Dictionary, accent_material: StandardMaterial3D,
     arrow.material_override = tread_material
     arrow.position = Vector3(0, 0.35, -size.y * 0.26 if direction.z > 0 else size.y * 0.26)
     arrow.rotation_degrees.y = rad_to_deg(atan2(direction.x, direction.z))
+    arrow.visibility_range_begin = 8.0
+    arrow.visibility_range_end = 120.0
     root.add_child(arrow)
 
     var belt_spot := SpotLight3D.new()
@@ -411,6 +485,11 @@ func _create_conveyor_belt(def: Dictionary, accent_material: StandardMaterial3D,
     collider.shape = shape
     collider.position = Vector3(0, 0.75, 0)
     area.add_child(collider)
+    if damage > 0.0:
+        area.body_entered.connect(func(body):
+            if body and body.has_method("take_damage"):
+                body.take_damage(damage)
+        )
     root.add_child(area)
 
     var end_light := OmniLight3D.new()
@@ -420,15 +499,10 @@ func _create_conveyor_belt(def: Dictionary, accent_material: StandardMaterial3D,
     end_light.position = Vector3(direction.normalized().x * size.x * 0.5, 1.2, direction.normalized().z * size.y * 0.5)
     root.add_child(end_light)
 
+    _cache_prefab(name, root)
     level_root.add_child(root)
 
-func _add_press_lanes(playfield: Vector2, accent_material: StandardMaterial3D):
-    var press_defs := [
-        {"name": "AtriumPress", "center": Vector3(playfield.x * 0.5, 0, playfield.y * 0.6), "size": Vector2(8, 8), "depth": 2.4, "cycle": 1.6},
-        {"name": "ShippingPress", "center": Vector3(playfield.x * 0.3, 0, playfield.y * 0.78), "size": Vector2(6, 8), "depth": 2.0, "cycle": 1.9},
-        {"name": "CoolingPress", "center": Vector3(playfield.x * 0.74, 0, playfield.y * 0.74), "size": Vector2(6, 6), "depth": 1.8, "cycle": 1.7},
-    ]
-
+func _add_press_lanes(playfield: Vector2, accent_material: StandardMaterial3D, press_defs: Array):
     for def in press_defs:
         _create_press(def, accent_material)
 
@@ -454,6 +528,9 @@ func _create_press(def: Dictionary, accent_material: StandardMaterial3D):
     frame_material.roughness = 0.44
     frame_instance.material_override = frame_material
     frame_instance.position = Vector3(0, frame_mesh.size.y * 0.5, 0)
+    frame_instance.visibility_range_begin = 12.0
+    frame_instance.visibility_range_end = 140.0
+    frame_instance.visibility_range_fade_mode = GeometryInstance3D.VISIBILITY_RANGE_FADE_DEPENDENCIES
     frame.add_child(frame_instance)
 
     var frame_collider := CollisionShape3D.new()
@@ -472,6 +549,9 @@ func _create_press(def: Dictionary, accent_material: StandardMaterial3D):
     head_instance.mesh = head_mesh
     head_instance.material_override = accent_material
     head_instance.position = Vector3(0, 3.5, 0)
+    head_instance.visibility_range_begin = 10.0
+    head_instance.visibility_range_end = 120.0
+    head_instance.visibility_range_fade_mode = GeometryInstance3D.VISIBILITY_RANGE_FADE_DEPENDENCIES
     head.add_child(head_instance)
 
     var head_collider := CollisionShape3D.new()
@@ -520,25 +600,25 @@ func _create_press(def: Dictionary, accent_material: StandardMaterial3D):
     root.add_child(slam_clang)
     _add_light_flicker(warning_light, warning_light.light_energy, 1.0, 0.7)
 
+    var press_nav := _make_local_nav_region("%sNavGate" % name, Rect2(-size.x * 0.35, -size.y * 0.35, size.x * 0.7, size.y * 0.7))
+    root.add_child(press_nav)
+
     var press_tween := create_tween().set_loops()
     press_tween.tween_property(head, "position:y", 0.4 + depth * 0.1, cycle * 0.32).set_delay(0.2)
+    press_tween.tween_callback(func(): press_nav.enabled = true)
     press_tween.tween_callback(func(): warning_light.light_energy = 3.2)
     press_tween.tween_callback(func(): slam_clang.play())
     press_tween.tween_property(head, "position:y", -depth, cycle * 0.18).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_IN)
+    press_tween.tween_callback(func(): press_nav.enabled = false)
     press_tween.tween_callback(func(): warning_light.light_energy = 1.2)
     press_tween.tween_property(head, "position:y", 3.5, cycle * 0.35).set_trans(Tween.TRANS_EXPO).set_ease(Tween.EASE_OUT)
     press_tween.tween_interval(0.1)
 
     root.add_child(head)
+    _cache_prefab(name, root)
     level_root.add_child(root)
 
-func _add_robotic_arm_rails(playfield: Vector2, accent_material: StandardMaterial3D):
-    var arm_defs := [
-        {"name": "NorthArm", "start": Vector3(playfield.x * 0.3, 1.2, playfield.y * 0.22), "end": Vector3(playfield.x * 0.7, 1.2, playfield.y * 0.22), "lift": 8.0},
-        {"name": "CentralArm", "start": Vector3(playfield.x * 0.22, 1.4, playfield.y * 0.52), "end": Vector3(playfield.x * 0.22, 1.4, playfield.y * 0.86), "lift": 7.2},
-        {"name": "SouthArm", "start": Vector3(playfield.x * 0.58, 1.2, playfield.y * 0.82), "end": Vector3(playfield.x * 0.82, 1.2, playfield.y * 0.64), "lift": 9.0},
-    ]
-
+func _add_robotic_arm_rails(playfield: Vector2, accent_material: StandardMaterial3D, arm_defs: Array):
     for def in arm_defs:
         _create_robotic_arm(def, accent_material)
 
@@ -565,6 +645,9 @@ func _create_robotic_arm(def: Dictionary, accent_material: StandardMaterial3D):
     rail_material.metallic = 0.2
     rail_material.roughness = 0.36
     rail.material_override = rail_material
+    rail.visibility_range_begin = 16.0
+    rail.visibility_range_end = 160.0
+    rail.visibility_range_fade_mode = GeometryInstance3D.VISIBILITY_RANGE_FADE_DEPENDENCIES
     root.add_child(rail)
 
     var arm := StaticBody3D.new()
@@ -577,6 +660,9 @@ func _create_robotic_arm(def: Dictionary, accent_material: StandardMaterial3D):
     pad.mesh = pad_mesh
     pad.material_override = accent_material
     pad.position = Vector3.ZERO
+    pad.visibility_range_begin = 12.0
+    pad.visibility_range_end = 130.0
+    pad.visibility_range_fade_mode = GeometryInstance3D.VISIBILITY_RANGE_FADE_SELF
     arm.add_child(pad)
 
     var pad_collision := CollisionShape3D.new()
@@ -625,7 +711,7 @@ func _create_robotic_arm(def: Dictionary, accent_material: StandardMaterial3D):
     _add_light_flicker(light, light.light_energy, 0.6, 0.55)
 
     var arc_particles := CPUParticles3D.new()
-    arc_particles.amount = 22
+    arc_particles.amount = 18
     arc_particles.lifetime = 0.4
     arc_particles.preprocess = 0.2
     arc_particles.emitting = true
@@ -639,6 +725,8 @@ func _create_robotic_arm(def: Dictionary, accent_material: StandardMaterial3D):
     arc_particles.scale_amount_max = 0.18
     arc_particles.color = Color(1.0, 0.56, 0.34, 0.8)
     arc_particles.position = Vector3(0, 0.7, 0)
+    arc_particles.visibility_range_begin = 10.0
+    arc_particles.visibility_range_end = 90.0
     arm.add_child(arc_particles)
 
     var travel_spot := SpotLight3D.new()
@@ -652,15 +740,10 @@ func _create_robotic_arm(def: Dictionary, accent_material: StandardMaterial3D):
     _add_light_flicker(travel_spot, travel_spot.light_energy, 0.8, 0.68)
     root.add_child(travel_spot)
 
+    _cache_prefab(name, root)
     level_root.add_child(root)
 
-func _add_updraft_furnaces(playfield: Vector2, accent_material: StandardMaterial3D, secondary_material: StandardMaterial3D):
-    var furnace_defs := [
-        {"name": "SmelterUpdraft", "center": Vector3(playfield.x * 0.72, 0, playfield.y * 0.42), "radius": 2.4, "height": 10.0, "force": 22.0},
-        {"name": "AssemblyUpdraft", "center": Vector3(playfield.x * 0.24, 0, playfield.y * 0.38), "radius": 2.2, "height": 9.0, "force": 19.0},
-        {"name": "CoolingUpdraft", "center": Vector3(playfield.x * 0.64, 0, playfield.y * 0.64), "radius": 2.6, "height": 11.0, "force": 24.0},
-    ]
-
+func _add_updraft_furnaces(playfield: Vector2, accent_material: StandardMaterial3D, secondary_material: StandardMaterial3D, furnace_defs: Array):
     for def in furnace_defs:
         _create_furnace(def, accent_material, secondary_material)
 
@@ -690,6 +773,9 @@ func _create_furnace(def: Dictionary, accent_material: StandardMaterial3D, secon
     stack_mat.emission_energy_multiplier = 1.1
     stack.material_override = stack_mat
     stack.position = Vector3(0, stack_mesh.height * 0.5, 0)
+    stack.visibility_range_begin = 14.0
+    stack.visibility_range_end = 180.0
+    stack.visibility_range_fade_mode = GeometryInstance3D.VISIBILITY_RANGE_FADE_DEPENDENCIES
     root.add_child(stack)
 
     var furnace_light := OmniLight3D.new()
@@ -759,7 +845,7 @@ func _create_furnace(def: Dictionary, accent_material: StandardMaterial3D, secon
     spawn_positions.append(center + platform_instance.position + Vector3(0, 0.95, 0))
 
     var flame := CPUParticles3D.new()
-    flame.amount = 120
+    flame.amount = 90
     flame.lifetime = 1.2
     flame.one_shot = false
     flame.emitting = true
@@ -774,7 +860,85 @@ func _create_furnace(def: Dictionary, accent_material: StandardMaterial3D, secon
     flame.position = Vector3(0, 0.4, 0)
     root.add_child(flame)
 
+    _cache_prefab(name, root)
     level_root.add_child(root)
+
+func _subtract_rect(rect: Rect2, hole: Rect2) -> Array:
+    var remaining: Array = []
+    var intersection := rect.intersection(hole)
+    if not intersection.has_area():
+        remaining.append(rect)
+        return remaining
+
+    var top_height := intersection.position.y - rect.position.y
+    if top_height > 0.1:
+        remaining.append(Rect2(rect.position.x, rect.position.y, rect.size.x, top_height))
+
+    var bottom_y := intersection.position.y + intersection.size.y
+    var bottom_height := (rect.position.y + rect.size.y) - bottom_y
+    if bottom_height > 0.1:
+        remaining.append(Rect2(rect.position.x, bottom_y, rect.size.x, bottom_height))
+
+    var left_width := intersection.position.x - rect.position.x
+    if left_width > 0.1:
+        remaining.append(Rect2(rect.position.x, intersection.position.y, left_width, intersection.size.y))
+
+    var right_x := intersection.position.x + intersection.size.x
+    var right_width := (rect.position.x + rect.size.x) - right_x
+    if right_width > 0.1:
+        remaining.append(Rect2(right_x, intersection.position.y, right_width, intersection.size.y))
+
+    return remaining
+
+func _build_navigation_layout(walkable_regions: Array, blockers: Array):
+    var safe_rects: Array = []
+    for region in walkable_regions:
+        var slices := [region]
+        for block in blockers:
+            var next_slices := []
+            for slice in slices:
+                next_slices.append_array(_subtract_rect(slice, block))
+            slices = next_slices
+        safe_rects.append_array(slices)
+
+    if safe_rects.is_empty():
+        return
+
+    var nav_mesh := NavigationMesh.new()
+    var vertices := PackedVector3Array()
+
+    for rect in safe_rects:
+        var base_index := vertices.size()
+        vertices.append(Vector3(rect.position.x, 0.35, rect.position.y))
+        vertices.append(Vector3(rect.position.x + rect.size.x, 0.35, rect.position.y))
+        vertices.append(Vector3(rect.position.x + rect.size.x, 0.35, rect.position.y + rect.size.y))
+        vertices.append(Vector3(rect.position.x, 0.35, rect.position.y + rect.size.y))
+        nav_mesh.add_polygon(PackedInt32Array([base_index, base_index + 1, base_index + 2, base_index + 3]))
+
+    nav_mesh.vertices = vertices
+
+    var region := NavigationRegion3D.new()
+    region.name = "FactoryNav"
+    region.navigation_mesh = nav_mesh
+    region.navigation_layers = 1
+    level_root.add_child(region)
+
+func _make_local_nav_region(name: String, rect: Rect2) -> NavigationRegion3D:
+    var nav_mesh := NavigationMesh.new()
+    var vertices := PackedVector3Array([
+        Vector3(rect.position.x, 0.32, rect.position.y),
+        Vector3(rect.position.x + rect.size.x, 0.32, rect.position.y),
+        Vector3(rect.position.x + rect.size.x, 0.32, rect.position.y + rect.size.y),
+        Vector3(rect.position.x, 0.32, rect.position.y + rect.size.y),
+    ])
+    nav_mesh.vertices = vertices
+    nav_mesh.add_polygon(PackedInt32Array([0, 1, 2, 3]))
+
+    var region := NavigationRegion3D.new()
+    region.name = name
+    region.navigation_mesh = nav_mesh
+    region.navigation_layers = 1
+    return region
 
 func _add_factory_fx(playfield: Vector2):
     var fx_positions := [
@@ -784,38 +948,48 @@ func _add_factory_fx(playfield: Vector2):
     ]
 
     for pos in fx_positions:
-        var sparks := CPUParticles3D.new()
-        sparks.amount = 80
-        sparks.lifetime = 0.8
-        sparks.one_shot = false
-        sparks.emitting = true
-        sparks.preprocess = 0.3
-        sparks.direction = Vector3(0.1, 1.0, 0)
-        sparks.spread = 0.7
-        sparks.initial_velocity_min = 5.0
-        sparks.initial_velocity_max = 9.0
-        sparks.gravity = Vector3(0, -1.0, 0)
-        sparks.scale_amount_min = 0.08
-        sparks.scale_amount_max = 0.2
-        sparks.color = Color(1.0, 0.54, 0.26, 0.9)
+        var sparks := _get_pooled_particles("factory_sparks", func():
+            var p := CPUParticles3D.new()
+            p.amount = 60
+            p.lifetime = 0.8
+            p.one_shot = false
+            p.preprocess = 0.3
+            p.direction = Vector3(0.1, 1.0, 0)
+            p.spread = 0.7
+            p.initial_velocity_min = 5.0
+            p.initial_velocity_max = 9.0
+            p.gravity = Vector3(0, -1.0, 0)
+            p.scale_amount_min = 0.08
+            p.scale_amount_max = 0.2
+            p.color = Color(1.0, 0.54, 0.26, 0.9)
+            return p
+        )
+        sparks.reparent(level_root)
+        sparks.amount = 60
         sparks.position = pos
-        level_root.add_child(sparks)
+        sparks.emitting = true
+        sparks.visible = true
 
-        var smoke := CPUParticles3D.new()
-        smoke.amount = 30
-        smoke.lifetime = 2.6
-        smoke.one_shot = false
-        smoke.emitting = true
-        smoke.preprocess = 0.4
-        smoke.direction = Vector3(0, 1, 0)
-        smoke.initial_velocity_min = 1.2
-        smoke.initial_velocity_max = 2.5
-        smoke.gravity = Vector3(0, -0.8, 0)
-        smoke.scale_amount_min = 0.8
-        smoke.scale_amount_max = 1.4
-        smoke.color = Color(0.15, 0.16, 0.18, 0.6)
+        var smoke := _get_pooled_particles("factory_smoke", func():
+            var p := CPUParticles3D.new()
+            p.amount = 22
+            p.lifetime = 2.6
+            p.one_shot = false
+            p.preprocess = 0.4
+            p.direction = Vector3(0, 1, 0)
+            p.initial_velocity_min = 1.2
+            p.initial_velocity_max = 2.5
+            p.gravity = Vector3(0, -0.8, 0)
+            p.scale_amount_min = 0.8
+            p.scale_amount_max = 1.4
+            p.color = Color(0.15, 0.16, 0.18, 0.6)
+            return p
+        )
+        smoke.reparent(level_root)
+        smoke.amount = 22
         smoke.position = pos + Vector3(0.4, 0.1, 0)
-        level_root.add_child(smoke)
+        smoke.emitting = true
+        smoke.visible = true
 
 func _apply_lethal_damage(body: Node):
     if body and body.has_method("take_damage"):
@@ -883,6 +1057,9 @@ func _scatter_supports(center: Vector3, size: Vector2, count: int, accent: Stand
         )
         pillar.position = center + offset
         level_root.add_child(pillar)
+
+func _rect_from_center_size(center: Vector3, size: Vector2) -> Rect2:
+    return Rect2(center.x - size.x * 0.5, center.z - size.y * 0.5, size.x, size.y)
 
 func _create_wall_segment(root: Node3D, size: Vector3, wall_position: Vector3, wall_material: StandardMaterial3D):
     var wall := StaticBody3D.new()
