@@ -130,7 +130,7 @@ func _compose_mesh(parts: Array) -> Mesh:
 func _part_transform(part: Dictionary) -> Transform3D:
     var origin: Vector3 = part.get("origin", Vector3.ZERO)
     var rotation_deg: Vector3 = part.get("rotation_degrees", Vector3.ZERO)
-    var scale: Vector3 = part.get("scale", Vector3.ONE)
+    var scale_vec: Vector3 = part.get("scale", Vector3.ONE)
     var part_basis := Basis.from_euler(rotation_deg * (PI / 180.0))
-    part_basis = part_basis.scaled(scale)
+    part_basis = part_basis.scaled(scale_vec)
     return Transform3D(part_basis, origin)

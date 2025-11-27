@@ -2,25 +2,26 @@ extends Node3D
 
 const WeaponData = preload("res://scripts/weapon_data.gd")
 
-const DEFAULT_TILE_SCENE := preload("res://scenes/LevelTile.tscn")
 const DEFAULT_PLAYER_SCENE := preload("res://scenes/Player.tscn")
 const DEFAULT_ENEMY_SCENE := preload("res://scenes/Enemy.tscn")
 const DEFAULT_RANGED_ENEMY_SCENE := preload("res://scenes/RangedEnemy.tscn")
 const DEFAULT_PICKUP_SCENE := preload("res://scenes/WeaponPickup.tscn")
 
-@export var grid_size := Vector2i(14, 14)
+@export var grid_size := Vector2i(20, 20)
 @export var tile_size := 6.5
 @export var tile_height_variation := 1.2
 @export var cover_chance := 0.18
 @export var vertical_feature_chance := 0.22
 @export var auto_start := false
-@export var tile_scene: PackedScene = DEFAULT_TILE_SCENE
 @export var player_scene: PackedScene = DEFAULT_PLAYER_SCENE
 @export var enemy_scene: PackedScene = DEFAULT_ENEMY_SCENE
 @export var ranged_enemy_scene: PackedScene = DEFAULT_RANGED_ENEMY_SCENE
 @export var pickup_scene: PackedScene = DEFAULT_PICKUP_SCENE
 
 var floor_positions: Array = []
+var spawn_positions: Array = []
+var height_map: Array = []
+var height_range := Vector2.ZERO
 var player: Node3D
 var rng := RandomNumberGenerator.new()
 var game_over := false
@@ -42,7 +43,7 @@ func _ready():
     height_noise.seed = randi()
     height_noise.frequency = 0.07
     height_noise.fractal_octaves = 3
-    tile_scene = tile_scene if tile_scene else DEFAULT_TILE_SCENE
+    _ensure_default_input()
     player_scene = player_scene if player_scene else DEFAULT_PLAYER_SCENE
     enemy_scene = enemy_scene if enemy_scene else DEFAULT_ENEMY_SCENE
     ranged_enemy_scene = ranged_enemy_scene if ranged_enemy_scene else DEFAULT_RANGED_ENEMY_SCENE
@@ -53,6 +54,48 @@ func _ready():
         start_round()
     else:
         Input.set_mouse_mode(Input.MOUSE_MODE_VISIBLE)
+
+func _ensure_default_input():
+    _ensure_action("move_forward", [_key(KEY_W), _key(KEY_UP), _joy_axis(1, -1.0)])
+    _ensure_action("move_backward", [_key(KEY_S), _key(KEY_DOWN), _joy_axis(1, 1.0)])
+    _ensure_action("move_left", [_key(KEY_A), _key(KEY_LEFT), _joy_axis(0, -1.0)])
+    _ensure_action("move_right", [_key(KEY_D), _key(KEY_RIGHT), _joy_axis(0, 1.0)])
+    _ensure_action("jump", [_key(KEY_SPACE), _joy_button(0)])
+    _ensure_action("fire", [_mouse_button(MOUSE_BUTTON_LEFT), _mouse_button(MOUSE_BUTTON_RIGHT)])
+    _ensure_action("switch_next", [_key(KEY_Q), _mouse_button(MOUSE_BUTTON_WHEEL_UP)])
+    _ensure_action("switch_prev", [_key(KEY_E), _mouse_button(MOUSE_BUTTON_WHEEL_DOWN)])
+    _ensure_action("sprint", [_key(KEY_SHIFT)])
+    _ensure_action("crouch", [_key(KEY_CTRL), _key(KEY_C)])
+
+func _ensure_action(action_name: String, events: Array):
+    if not InputMap.has_action(action_name):
+        InputMap.add_action(action_name)
+    if InputMap.action_get_events(action_name).is_empty():
+        for event in events:
+            if event:
+                InputMap.action_add_event(action_name, event)
+
+func _key(code: int) -> InputEventKey:
+    var ev := InputEventKey.new()
+    ev.keycode = code
+    ev.physical_keycode = code
+    return ev
+
+func _mouse_button(index: int) -> InputEventMouseButton:
+    var ev := InputEventMouseButton.new()
+    ev.button_index = index
+    return ev
+
+func _joy_button(index: int) -> InputEventJoypadButton:
+    var ev := InputEventJoypadButton.new()
+    ev.button_index = index
+    return ev
+
+func _joy_axis(axis: int, sign: float) -> InputEventJoypadMotion:
+    var ev := InputEventJoypadMotion.new()
+    ev.axis = axis
+    ev.axis_value = sign
+    return ev
 
 func start_round():
     game_over = false
@@ -70,6 +113,8 @@ func start_round():
 
 func clear_game():
     floor_positions.clear()
+    spawn_positions.clear()
+    height_map.clear()
     for child in level_root.get_children():
         child.queue_free()
     for child in pickup_root.get_children():
@@ -80,52 +125,311 @@ func clear_game():
         player.queue_free()
 
 func generate_level():
-    var heights := _build_height_map()
+    height_map = _build_flat_height_map()
+    height_range = Vector2(0.0, 8.0)
+    _build_flat_floor()
+    _add_boundary_walls(height_range)
+    _record_flat_spawns()
+
+func _build_flat_height_map() -> Array:
+    var heights: Array = []
     for x in range(grid_size.x):
+        heights.append([])
         for y in range(grid_size.y):
-            var tile = tile_scene.instantiate()
-            var height_offset = heights[x][y]
-            tile.position = Vector3(x * tile_size, height_offset, y * tile_size)
-            tile.rotation_degrees.y = rng.randf_range(-1.2, 1.2)
-            _tint_tile(tile, height_offset, x, y)
-            level_root.add_child(tile)
-            floor_positions.append(tile.global_transform.origin + Vector3(0, 0.55, 0))
-            _maybe_add_cover(tile)
-            _maybe_add_vertical_feature(tile)
-            _decorate_tile(tile, height_offset, x, y)
+            heights[x].append(0.0)
+    return heights
+
+func _record_flat_spawns():
+    floor_positions.clear()
+    spawn_positions.clear()
+    var center := Vector3(grid_size.x * tile_size * 0.5, 0.0, grid_size.y * tile_size * 0.5)
+    floor_positions.append(center + Vector3(0, 0.55, 0))
+    spawn_positions.append(center + Vector3(0, 0.9, 0))
+
+func _build_flat_floor():
+    var floor_body := StaticBody3D.new()
+    floor_body.name = "FlatFloor"
+
+    var mesh_instance := MeshInstance3D.new()
+    var mesh := BoxMesh.new()
+    var length_x := grid_size.x * tile_size
+    var length_z := grid_size.y * tile_size
+    var thickness := 1.0
+    mesh.size = Vector3(length_x, thickness, length_z)
+    mesh_instance.mesh = mesh
+    mesh_instance.material_override = preload("res://materials/tile_material.tres")
+    mesh_instance.position = Vector3(length_x * 0.5, -thickness * 0.5, length_z * 0.5)
+    floor_body.add_child(mesh_instance)
+
+    var collider := CollisionShape3D.new()
+    var shape := BoxShape3D.new()
+    shape.size = mesh.size
+    collider.shape = shape
+    collider.position = mesh_instance.position
+    floor_body.add_child(collider)
+
+    level_root.add_child(floor_body)
+
+func _create_wall_segment(root: Node3D, size: Vector3, wall_position: Vector3, wall_material: StandardMaterial3D):
+    var wall := StaticBody3D.new()
+    var mesh_instance := MeshInstance3D.new()
+    var mesh := BoxMesh.new()
+    mesh.size = size
+    mesh_instance.mesh = mesh
+    mesh_instance.material_override = wall_material
+    mesh_instance.position.y = size.y * 0.5
+    wall.add_child(mesh_instance)
+
+    var collider := CollisionShape3D.new()
+    var shape := BoxShape3D.new()
+    shape.size = size
+    collider.shape = shape
+    collider.position.y = size.y * 0.5
+    wall.add_child(collider)
+
+    wall.position = wall_position
+    root.add_child(wall)
+
+func _add_boundary_walls(range: Vector2):
+    var boundary := Node3D.new()
+    boundary.name = "Boundary"
+
+    var max_height: float = max(range.y + 4.0, 8.0) * 3.0
+    var thickness := tile_size * 0.6
+    var length_x := grid_size.x * tile_size + thickness * 2.0
+    var length_z := grid_size.y * tile_size + thickness * 2.0
+    var center_x := grid_size.x * tile_size * 0.5
+    var center_z := grid_size.y * tile_size * 0.5
+
+    var wall_material := StandardMaterial3D.new()
+    wall_material.albedo_color = Color(0.14, 0.18, 0.22)
+    wall_material.roughness = 0.52
+    wall_material.metallic = 0.04
+
+    _create_wall_segment(boundary, Vector3(length_x, max_height, thickness), Vector3(center_x, 0, -thickness * 0.5), wall_material)
+    _create_wall_segment(boundary, Vector3(length_x, max_height, thickness), Vector3(center_x, 0, grid_size.y * tile_size + thickness * 0.5), wall_material)
+    _create_wall_segment(boundary, Vector3(thickness, max_height, length_z), Vector3(-thickness * 0.5, 0, center_z), wall_material)
+    _create_wall_segment(boundary, Vector3(thickness, max_height, length_z), Vector3(grid_size.x * tile_size + thickness * 0.5, 0, center_z), wall_material)
+
+    var ceiling := StaticBody3D.new()
+    ceiling.name = "Ceiling"
+    var ceiling_mesh := BoxMesh.new()
+    ceiling_mesh.size = Vector3(length_x, thickness, length_z)
+    var ceiling_instance := MeshInstance3D.new()
+    ceiling_instance.mesh = ceiling_mesh
+    ceiling_instance.position = Vector3(center_x, max_height + thickness * 0.5, center_z)
+    ceiling_instance.material_override = wall_material
+    var ceiling_collider := CollisionShape3D.new()
+    var ceiling_shape := BoxShape3D.new()
+    ceiling_shape.size = ceiling_mesh.size
+    ceiling_collider.shape = ceiling_shape
+    ceiling_collider.position = ceiling_instance.position
+    ceiling.add_child(ceiling_instance)
+    ceiling.add_child(ceiling_collider)
+    boundary.add_child(ceiling)
+
+    level_root.add_child(boundary)
+
+func _blur_heights(values: Array, passes: int) -> Array:
+    var current := values.duplicate(true)
+    var kernel := [[1.0, 2.0, 1.0], [2.0, 4.0, 2.0], [1.0, 2.0, 1.0]]
+    var kernel_sum := 0.0
+    for row in kernel:
+        for weight in row:
+            kernel_sum += weight
+    for i in range(passes):
+        var blurred: Array = []
+        for x in range(grid_size.x):
+            blurred.append([])
+            for y in range(grid_size.y):
+                var acc := 0.0
+                for ox in range(-1, 2):
+                    for oy in range(-1, 2):
+                        var nx = clamp(x + ox, 0, grid_size.x - 1)
+                        var ny = clamp(y + oy, 0, grid_size.y - 1)
+                        acc += current[nx][ny] * kernel[ox + 1][oy + 1]
+                blurred[x].append(acc / kernel_sum)
+        current = blurred
+    return current
+
+func _soften_gradients(values: Array, max_delta: float, passes: int) -> Array:
+    var current := values.duplicate(true)
+    for i in range(passes):
+        var softened: Array = []
+        for x in range(grid_size.x):
+            softened.append([])
+            for y in range(grid_size.y):
+                var base_height: float = current[x][y]
+                var total := base_height * 2.0
+                var count := 2.0
+                for ox in range(-1, 2):
+                    for oy in range(-1, 2):
+                        if ox == 0 and oy == 0:
+                            continue
+                        var nx = clamp(x + ox, 0, grid_size.x - 1)
+                        var ny = clamp(y + oy, 0, grid_size.y - 1)
+                        var neighbour_height: float = current[nx][ny]
+                        var limited_height = clamp(neighbour_height, base_height - max_delta, base_height + max_delta)
+                        total += limited_height
+                        count += 1.0
+                softened[x].append(total / count)
+        current = softened
+    return current
 
 func _build_height_map() -> Array:
     var heights: Array = []
     for x in range(grid_size.x):
         heights.append([])
         for y in range(grid_size.y):
-            var primary = height_noise.get_noise_2d(x, y) * tile_height_variation * 0.75
-            var ridges = height_noise.get_noise_2d(x * 0.35, y * 0.35) * tile_height_variation * 0.4
-            var waves = sin(x * 0.32) * 0.12 + cos(y * 0.28) * 0.1
-            heights[x].append(primary + ridges + waves)
-    for i in range(2):
-        var smoothed: Array = []
-        for x in range(grid_size.x):
-            smoothed.append([])
-            for y in range(grid_size.y):
-                var acc: float = float(heights[x][y]) * 3.0
-                var count: float = 3.0
-                for ox in range(-1, 2):
-                    for oy in range(-1, 2):
-                        var nx = x + ox
-                        var ny = y + oy
-                        if nx < 0 or ny < 0 or nx >= grid_size.x or ny >= grid_size.y or (ox == 0 and oy == 0):
-                            continue
-                        acc += heights[nx][ny]
-                        count += 1.0
-                smoothed[x].append(acc / count)
-        heights = smoothed
+            var slow_waves = sin(x * 0.09) * 0.4 + cos(y * 0.08) * 0.36
+            var base = height_noise.get_noise_2d(x * 0.16, y * 0.16) * tile_height_variation * 0.95
+            var dunes = height_noise.get_noise_2d((x + 19) * 0.26, (y - 11) * 0.26) * tile_height_variation * 0.55
+            var micro = height_noise.get_noise_2d((x - 37) * 0.72, (y + 7) * 0.72) * tile_height_variation * 0.15
+            heights[x].append(base + dunes * 0.6 + micro * 0.3 + slow_waves * 0.5)
+
+    heights = _blur_heights(heights, 4)
+    heights = _shape_edges(heights)
+    var max_step := tile_height_variation * 0.28
+    heights = _soften_gradients(heights, max_step, 3)
     return heights
+
+func _shape_edges(heights: Array) -> Array:
+    var shaped: Array = []
+    var rim_height: float = tile_height_variation * 3.2
+    var inner_radius: float = float(min(grid_size.x, grid_size.y)) * 0.42
+    for x in range(grid_size.x):
+        shaped.append([])
+        for y in range(grid_size.y):
+            var original: float = heights[x][y]
+            var center := Vector2(grid_size.x - 1, grid_size.y - 1) * 0.5
+            var dist: float = Vector2(x, y).distance_to(center)
+            var edge_distance: float = float(min(min(x, grid_size.x - 1 - x), min(y, grid_size.y - 1 - y)))
+            var rim_factor: float = clamp(1.0 - edge_distance / max(1.0, inner_radius * 0.38), 0.0, 1.0)
+            var basin_factor: float = clamp(dist / max(1.0, inner_radius), 0.0, 1.0)
+            var sculpted: float = original + rim_factor * rim_height - basin_factor * rim_height * 0.25
+            shaped[x].append(sculpted)
+    return shaped
+
+func _sample_height(heights: Array, ix: int, iy: int) -> float:
+    var sx = clamp(ix, 0, grid_size.x - 1)
+    var sy = clamp(iy, 0, grid_size.y - 1)
+    return heights[sx][sy]
+
+func _generate_floor_mesh(heights: Array) -> ArrayMesh:
+    var vertex_columns := grid_size.x + 1
+    var vertex_rows := grid_size.y + 1
+    var vertices := PackedVector3Array()
+    var normals := PackedVector3Array()
+    var uvs := PackedVector2Array()
+
+    for y in range(vertex_rows):
+        for x in range(vertex_columns):
+            var height = _sample_height(heights, x, y)
+            vertices.append(Vector3(x * tile_size, height, y * tile_size))
+
+            var left = _sample_height(heights, x - 1, y)
+            var right = _sample_height(heights, x + 1, y)
+            var down = _sample_height(heights, x, y - 1)
+            var up = _sample_height(heights, x, y + 1)
+            var normal := Vector3(left - right, 2.0, down - up).normalized()
+            normals.append(normal)
+
+            uvs.append(Vector2(float(x) / max(1, vertex_columns - 1), float(y) / max(1, vertex_rows - 1)))
+
+    var indices := PackedInt32Array()
+    for y in range(vertex_rows - 1):
+        for x in range(vertex_columns - 1):
+            var top_left := y * vertex_columns + x
+            var top_right := top_left + 1
+            var bottom_left := top_left + vertex_columns
+            var bottom_right := bottom_left + 1
+
+            indices.append_array([top_left, bottom_left, top_right])
+            indices.append_array([top_right, bottom_left, bottom_right])
+
+    var mesh := ArrayMesh.new()
+    var arrays := []
+    arrays.resize(Mesh.ARRAY_MAX)
+    arrays[Mesh.ARRAY_VERTEX] = vertices
+    arrays[Mesh.ARRAY_NORMAL] = normals
+    arrays[Mesh.ARRAY_TEX_UV] = uvs
+    arrays[Mesh.ARRAY_INDEX] = indices
+    mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arrays)
+    return mesh
+
+func _calculate_height_range(heights: Array) -> Vector2:
+    var min_height := INF
+    var max_height := -INF
+    for column in heights:
+        for value in column:
+            min_height = min(min_height, value)
+            max_height = max(max_height, value)
+    return Vector2(min_height, max_height)
+
+func _sample_height_interpolated(heights: Array, world_position: Vector3) -> float:
+    var gx = clamp(world_position.x / tile_size, 0.0, grid_size.x - 1.001)
+    var gy = clamp(world_position.z / tile_size, 0.0, grid_size.y - 1.001)
+    var x0 = int(floor(gx))
+    var y0 = int(floor(gy))
+    var x1 = clamp(x0 + 1, 0, grid_size.x - 1)
+    var y1 = clamp(y0 + 1, 0, grid_size.y - 1)
+    var tx = gx - float(x0)
+    var ty = gy - float(y0)
+
+    var h00 = heights[x0][y0]
+    var h10 = heights[x1][y0]
+    var h01 = heights[x0][y1]
+    var h11 = heights[x1][y1]
+    var hx0 = lerp(h00, h10, tx)
+    var hx1 = lerp(h01, h11, tx)
+    return lerp(hx0, hx1, ty)
+
+func _is_walkable_tile(heights: Array, x: int, y: int, max_slope := 1.6) -> bool:
+    if x <= 0 or y <= 0 or x >= grid_size.x - 1 or y >= grid_size.y - 1:
+        return false
+    var h: float = heights[x][y]
+    for ox in range(-1, 2):
+        for oy in range(-1, 2):
+            if ox == 0 and oy == 0:
+                continue
+            if abs(heights[x + ox][y + oy] - h) > max_slope:
+                return false
+    return true
+
+func _record_floor_spot(height_offset: float, x: int, y: int):
+    var base_position := Vector3(x * tile_size, height_offset, y * tile_size)
+    floor_positions.append(base_position + Vector3(0, 0.55, 0))
+    if _is_walkable_tile(height_map, x, y):
+        spawn_positions.append(base_position + Vector3(0, 0.9, 0))
+
+func _choose_center_spawn() -> Vector3:
+    var center := Vector3(grid_size.x * tile_size * 0.5, 0.0, grid_size.y * tile_size * 0.5)
+    var base_height := _sample_height_interpolated(height_map, center)
+    if spawn_positions.is_empty():
+        return Vector3(center.x, base_height + 1.4, center.z)
+    var closest: Vector3 = spawn_positions[0]
+    var best_distance := INF
+    for spot in spawn_positions:
+        var dist: float = Vector2(spot.x - center.x, spot.z - center.z).length()
+        if dist < best_distance:
+            best_distance = dist
+            closest = spot
+    var corrected_height := _sample_height_interpolated(height_map, closest)
+    return Vector3(closest.x, corrected_height + 1.4, closest.z)
 
 func _tint_tile(tile: Node, height_offset: float, x: int, y: int):
     var mesh_instance: MeshInstance3D = tile.get_node_or_null("MeshInstance3D")
     if mesh_instance:
         mesh_instance.material_override = _make_tile_material(height_offset, x, y)
+
+func _prepare_tile_visuals(tile: Node, height_offset: float, x: int, y: int):
+    var mesh_instance: MeshInstance3D = tile.get_node_or_null("MeshInstance3D")
+    if mesh_instance:
+        mesh_instance.visible = false
+    var collision_shape: CollisionShape3D = tile.get_node_or_null("CollisionShape3D")
+    if collision_shape:
+        collision_shape.disabled = true
+    _tint_tile(tile, height_offset, x, y)
 
 func _make_tile_material(height_offset: float, x: int, y: int) -> StandardMaterial3D:
     var mat := StandardMaterial3D.new()
@@ -272,11 +576,12 @@ func _maybe_add_vertical_feature(tile: Node3D):
 
     tile.add_child(platform)
     floor_positions.append(platform.global_transform.origin + Vector3(0, 0.55, 0))
+    spawn_positions.append(platform.global_transform.origin + Vector3(0, 0.9, 0))
 
 func spawn_player():
     player = player_scene.instantiate()
     add_child(player)
-    player.global_transform.origin = Vector3(grid_size.x * tile_size * 0.5, 2.0, grid_size.y * tile_size * 0.5)
+    player.global_transform.origin = _choose_center_spawn()
     if player.has_method("apply_settings"):
         player.apply_settings(pending_settings)
     player.set_weapons(WeaponData.WEAPONS)
@@ -286,26 +591,10 @@ func spawn_player():
         hud.update_health(player.max_health, player.max_health)
 
 func spawn_pickups():
-    for data in WeaponData.WEAPONS:
-        if data.get("id") == "pistol":
-            continue
-        var pickup = pickup_scene.instantiate()
-        pickup.weapon_id = data.get("id")
-        pickup.display_name = data.get("name")
-        var pickup_position = get_random_floor_position() + Vector3(0, 0.5, 0)
-        var label = pickup.get_node_or_null("Label3D")
-        if label:
-            label.text = data.get("name")
-        pickup_root.add_child(pickup)
-        pickup.global_transform.origin = pickup_position
+    pass
 
 func spawn_enemies():
-    var melee_count := 6
-    var ranged_count := 4
-    for i in range(melee_count):
-        _spawn_enemy(enemy_scene)
-    for i in range(ranged_count):
-        _spawn_enemy(ranged_enemy_scene)
+    pass
 
 func _spawn_enemy(scene: PackedScene):
     if scene == null:
@@ -317,17 +606,21 @@ func _spawn_enemy(scene: PackedScene):
     enemy.global_transform.origin = enemy_position
 
 func get_random_floor_position(min_distance := 0.0) -> Vector3:
-    if floor_positions.is_empty():
+    var pool := spawn_positions if not spawn_positions.is_empty() else floor_positions
+    if pool.is_empty():
         return Vector3.ZERO
     var attempts := 0
     while attempts < 12:
-        var candidate = floor_positions[rng.randi_range(0, floor_positions.size() - 1)]
+        var candidate: Vector3 = pool[rng.randi_range(0, pool.size() - 1)]
+        candidate.y = _sample_height_interpolated(height_map, candidate) + 0.9
         if not is_instance_valid(player) or min_distance <= 0.0:
             return candidate
         if candidate.distance_to(player.global_transform.origin) >= min_distance:
             return candidate
         attempts += 1
-    return floor_positions[0]
+    var fallback: Vector3 = pool[0]
+    fallback.y = _sample_height_interpolated(height_map, fallback) + 0.9
+    return fallback
 
 func _unhandled_input(event):
     var wants_pause: bool = event.is_action_pressed("ui_cancel")

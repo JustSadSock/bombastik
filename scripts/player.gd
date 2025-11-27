@@ -2,24 +2,32 @@ extends CharacterBody3D
 
 signal died
 
-var gravity: float = ProjectSettings.get_setting("physics/3d/default_gravity")
+var gravity: float = ProjectSettings.get_setting("physics/3d/default_gravity") * 1.18
 
 const DEFAULT_PROJECTILE_SCENE := preload("res://scenes/Projectile.tscn")
 const DEFAULT_EXPLOSION_SCENE := preload("res://scenes/Explosion.tscn")
 
-@export var speed := 10.0
-@export var sprint_multiplier := 1.6
+@export var speed := 15.0
+@export var sprint_multiplier := 1.9
 @export var crouch_multiplier := 0.6
-@export var jump_velocity := 6.2
-@export var acceleration := 18.0
-@export var air_acceleration := 10.0
-@export var friction := 12.0
-@export var slide_speed := 16.0
-@export var slide_duration := 0.55
+@export var jump_velocity := 7.4
+@export var acceleration := 56.0
+@export var air_acceleration := 24.0
+@export var friction := 26.0
+@export var slide_speed := 22.0
+@export var slide_duration := 0.48
 @export var step_height := 0.8
 @export var step_check_distance := 0.65
 @export var coyote_time := 0.18
 @export var camera_sensitivity := 0.002
+@export var wall_run_duration := 1.2
+@export var wall_run_gravity_scale := 0.35
+@export var wall_run_idle_gravity_scale := 1.05
+@export var wall_run_camera_tilt := 12.0
+@export var wall_run_drop_speed := -8.0
+@export var wall_run_extra_drop := 6.0
+@export var wall_run_tilt_speed := 8.0
+@export var wall_jump_push := 11.0
 @export var head_bob_speed := 6.0
 @export var head_bob_amount := 0.02
 @export var camera_shake := 0.035
@@ -47,6 +55,9 @@ var jump_buffer_time := 0.0
 var jumps_used := 0
 var was_on_floor := false
 var was_sliding := false
+var wall_run_time := 0.0
+var wall_run_normal := Vector3.ZERO
+var wall_tilt_target := 0.0
 
 var lean_tween: Tween
 
@@ -128,30 +139,71 @@ func _physics_process(delta):
         return
     var was_grounded = is_on_floor()
     var sliding_before = slide_time > 0.0
+    var wall_collision := _get_wall_collision()
+    var input_dir = Input.get_vector("move_left", "move_right", "move_forward", "move_backward")
+    if input_dir == Vector2.ZERO and force_move_input != Vector2.ZERO:
+        input_dir = force_move_input.normalized()
+    var direction = (transform.basis * Vector3(input_dir.x, 0, input_dir.y)).normalized()
+
+    if is_on_floor():
+        wall_run_time = 0.0
+        wall_run_normal = Vector3.ZERO
+        wall_tilt_target = 0.0
+    elif wall_collision and abs(wall_collision.get_normal().y) < 0.2 and wall_run_time <= 0.0:
+        wall_run_normal = wall_collision.get_normal()
+        wall_run_time = wall_run_duration
+    var wall_running := wall_run_time > 0.0 and wall_run_normal != Vector3.ZERO and not is_on_floor()
     if not is_on_floor():
-        velocity.y -= gravity * delta
+        var gravity_scale := wall_run_gravity_scale if wall_running else 1.0
+        if wall_running:
+            gravity_scale = lerp(wall_run_idle_gravity_scale, wall_run_gravity_scale, clamp(direction.length(), 0.0, 1.0))
+        wall_run_time = max(0.0, wall_run_time - delta)
+        velocity.y -= gravity * gravity_scale * delta
+        if wall_running:
+            var extra_drop: float = (1.0 - clamp(direction.length(), 0.0, 1.0)) * wall_run_extra_drop
+            velocity.y = max(velocity.y, wall_run_drop_speed - extra_drop)
         coyote_timer = max(0.0, coyote_timer - delta)
     else:
         coyote_timer = coyote_time
         jumps_used = 0
+        wall_run_time = 0.0
+
+    if wall_running and direction.length() < 0.2:
+        wall_run_time = max(0.0, wall_run_time - delta * 1.5)
     if Input.is_action_just_pressed("jump"):
         jump_buffer_time = 0.18
     jump_buffer_time = max(0.0, jump_buffer_time - delta)
 
-    if jump_buffer_time > 0.0 and (is_on_floor() or coyote_timer > 0.0 or jumps_used < MAX_JUMPS - 1):
-        velocity.y = jump_velocity
+    if jump_buffer_time > 0.0 and (is_on_floor() or coyote_timer > 0.0 or jumps_used < MAX_JUMPS):
+        var performing_wall_jump := wall_running and not is_on_floor()
+        if performing_wall_jump:
+            wall_run_time = 0.0
+            var view_dir := -head.global_transform.basis.z
+            var planar_view := Vector3(view_dir.x, 0.0, view_dir.z)
+            if planar_view.length() < 0.05:
+                var backup_dir := transform.basis * Vector3.FORWARD
+                planar_view = Vector3(backup_dir.x, 0.0, backup_dir.z)
+            planar_view = planar_view.normalized()
+            var away_boost := wall_run_normal * 0.65
+            var jump_dir := (planar_view + away_boost).normalized()
+            var wall_boost := jump_dir * wall_jump_push
+            velocity += wall_boost
+            velocity.y = min(velocity.y, jump_velocity * 0.2)
+        else:
+            velocity.y = jump_velocity
         coyote_timer = 0.0
         jumps_used += 1
         jump_buffer_time = 0.0
         _play_sound(jump_audio, 520.0 + 60.0 * jumps_used, 0.16, 0.55)
         _animate_air_push()
-    var input_dir = Input.get_vector("move_left", "move_right", "move_forward", "move_backward")
-    if input_dir == Vector2.ZERO and force_move_input != Vector2.ZERO:
-        input_dir = force_move_input.normalized()
-    var direction = (transform.basis * Vector3(input_dir.x, 0, input_dir.y)).normalized()
     var is_crouching = Input.is_action_pressed("crouch")
     if Input.is_action_just_pressed("crouch") and is_on_floor() and direction.length() > 0.1 and slide_time <= 0.0:
         start_slide(direction)
+    if wall_running:
+        direction = (direction - wall_run_normal * direction.dot(wall_run_normal)).normalized()
+        wall_tilt_target = -wall_run_camera_tilt * sign(transform.basis.x.dot(wall_run_normal))
+    else:
+        wall_tilt_target = 0.0
     var target_speed = speed * (sprint_multiplier if Input.is_action_pressed("sprint") and not is_crouching else 1.0)
     var acceleration_value := acceleration if is_on_floor() else air_acceleration
     if slide_time > 0.0:
@@ -171,6 +223,13 @@ func _physics_process(delta):
             velocity.z = move_toward(velocity.z, 0.0, friction * delta)
     apply_step_assist(direction)
     move_and_slide()
+    if wall_running:
+        var new_wall := _get_wall_collision()
+        if new_wall and abs(new_wall.get_normal().y) < 0.2:
+            wall_run_normal = new_wall.get_normal()
+        else:
+            wall_run_time = max(0.0, wall_run_time - delta * 2.0)
+    _apply_wall_tilt(delta)
     apply_crouch(delta, is_crouching)
     apply_headbob(delta, direction)
     if not was_grounded and is_on_floor():
@@ -259,8 +318,7 @@ func spawn_projectile(direction: Vector3, weapon_data: Dictionary):
         return
     var projectile = projectile_scene.instantiate()
     var spawn_origin := muzzle.global_transform.origin
-    var projectile_basis := Basis()
-    projectile_basis = projectile_basis.looking_at(direction.normalized(), Vector3.UP)
+    var projectile_basis := Basis.looking_at(direction.normalized(), Vector3.UP)
     projectile.global_transform = Transform3D(projectile_basis, spawn_origin)
     projectile.set("velocity", direction * weapon_data.get("projectile_speed", 40.0))
     projectile.set("damage", weapon_data.get("damage", 10.0))
@@ -329,6 +387,17 @@ func apply_step_assist(direction: Vector3):
         if not test_move(raised, motion):
             global_transform = raised
             velocity.y = 0.0
+
+func _get_wall_collision() -> KinematicCollision3D:
+    for i in range(get_slide_collision_count()):
+        var collision := get_slide_collision(i)
+        if collision and abs(collision.get_normal().y) < 0.2:
+            return collision
+    return null
+
+func _apply_wall_tilt(delta: float):
+    var target_tilt := deg_to_rad(wall_tilt_target)
+    head.rotation.z = lerp(head.rotation.z, target_tilt, wall_run_tilt_speed * delta)
 
 func apply_headbob(delta: float, _direction: Vector3):
     var horizontal_speed = Vector2(velocity.x, velocity.z).length()
