@@ -461,8 +461,7 @@ func _create_conveyor_belt(def: Dictionary, accent_material: StandardMaterial3D,
     var belt_spot := SpotLight3D.new()
     belt_spot.light_color = Color(1.0, 0.42, 0.26)
     belt_spot.light_energy = 3.0
-    belt_spot.inner_angle = 18.0
-    belt_spot.outer_angle = 46.0
+    belt_spot.spot_angle = 46.0
     belt_spot.spot_range = max(size.x, size.y) * 0.9
     belt_spot.position = Vector3(0, 3.0, 0)
     belt_spot.look_at(direction.normalized() * 3.0, Vector3.UP)
@@ -583,8 +582,7 @@ func _create_press(def: Dictionary, accent_material: StandardMaterial3D):
     var press_spot := SpotLight3D.new()
     press_spot.light_color = Color(1.0, 0.28, 0.16)
     press_spot.light_energy = 3.6
-    press_spot.inner_angle = 20.0
-    press_spot.outer_angle = 48.0
+    press_spot.spot_angle = 48.0
     press_spot.spot_range = max(size.x, size.y) * 1.4
     press_spot.position = Vector3(0, 4.0, 0)
     press_spot.look_at(Vector3(0, 2.0, 0), Vector3.UP)
@@ -733,8 +731,7 @@ func _create_robotic_arm(def: Dictionary, accent_material: StandardMaterial3D):
     travel_spot.light_color = Color(1.0, 0.36, 0.2)
     travel_spot.light_energy = 2.8
     travel_spot.spot_range = span.length() * 1.2
-    travel_spot.inner_angle = 16.0
-    travel_spot.outer_angle = 36.0
+    travel_spot.spot_angle = 36.0
     travel_spot.position = Vector3(0, 3.6, 0)
     travel_spot.look_at(Vector3(0, 1.0, 0) + span.normalized(), Vector3.UP)
     _add_light_flicker(travel_spot, travel_spot.light_energy, 0.8, 0.68)
