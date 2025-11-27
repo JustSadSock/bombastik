@@ -20,6 +20,11 @@ const DEFAULT_EXPLOSION_SCENE := preload("res://scenes/Explosion.tscn")
 @export var step_check_distance := 0.65
 @export var coyote_time := 0.18
 @export var camera_sensitivity := 0.002
+@export var wall_run_duration := 1.2
+@export var wall_run_gravity_scale := 0.35
+@export var wall_run_camera_tilt := 12.0
+@export var wall_run_drop_speed := -6.5
+@export var wall_run_tilt_speed := 8.0
 @export var head_bob_speed := 6.0
 @export var head_bob_amount := 0.02
 @export var camera_shake := 0.035
@@ -47,6 +52,9 @@ var jump_buffer_time := 0.0
 var jumps_used := 0
 var was_on_floor := false
 var was_sliding := false
+var wall_run_time := 0.0
+var wall_run_normal := Vector3.ZERO
+var wall_tilt_target := 0.0
 
 var lean_tween: Tween
 
@@ -128,17 +136,31 @@ func _physics_process(delta):
         return
     var was_grounded = is_on_floor()
     var sliding_before = slide_time > 0.0
+    var wall_collision := _get_wall_collision()
+    if is_on_floor():
+        wall_run_time = 0.0
+        wall_run_normal = Vector3.ZERO
+        wall_tilt_target = 0.0
+    elif wall_collision and abs(wall_collision.get_normal().y) < 0.2 and wall_run_time <= 0.0:
+        wall_run_normal = wall_collision.get_normal()
+        wall_run_time = wall_run_duration
+    var wall_running := wall_run_time > 0.0 and wall_run_normal != Vector3.ZERO and not is_on_floor()
     if not is_on_floor():
-        velocity.y -= gravity * delta
+        var gravity_scale := wall_run_gravity_scale if wall_running else 1.0
+        wall_run_time = max(0.0, wall_run_time - delta)
+        velocity.y -= gravity * gravity_scale * delta
+        if wall_running:
+            velocity.y = max(velocity.y, wall_run_drop_speed)
         coyote_timer = max(0.0, coyote_timer - delta)
     else:
         coyote_timer = coyote_time
         jumps_used = 0
+        wall_run_time = 0.0
     if Input.is_action_just_pressed("jump"):
         jump_buffer_time = 0.18
     jump_buffer_time = max(0.0, jump_buffer_time - delta)
 
-    if jump_buffer_time > 0.0 and (is_on_floor() or coyote_timer > 0.0 or jumps_used < MAX_JUMPS - 1):
+    if jump_buffer_time > 0.0 and (is_on_floor() or coyote_timer > 0.0 or jumps_used < MAX_JUMPS):
         velocity.y = jump_velocity
         coyote_timer = 0.0
         jumps_used += 1
@@ -152,6 +174,11 @@ func _physics_process(delta):
     var is_crouching = Input.is_action_pressed("crouch")
     if Input.is_action_just_pressed("crouch") and is_on_floor() and direction.length() > 0.1 and slide_time <= 0.0:
         start_slide(direction)
+    if wall_running:
+        direction = (direction - wall_run_normal * direction.dot(wall_run_normal)).normalized()
+        wall_tilt_target = -wall_run_camera_tilt * sign(transform.basis.x.dot(wall_run_normal))
+    else:
+        wall_tilt_target = 0.0
     var target_speed = speed * (sprint_multiplier if Input.is_action_pressed("sprint") and not is_crouching else 1.0)
     var acceleration_value := acceleration if is_on_floor() else air_acceleration
     if slide_time > 0.0:
@@ -171,6 +198,13 @@ func _physics_process(delta):
             velocity.z = move_toward(velocity.z, 0.0, friction * delta)
     apply_step_assist(direction)
     move_and_slide()
+    if wall_running:
+        var new_wall := _get_wall_collision()
+        if new_wall and abs(new_wall.get_normal().y) < 0.2:
+            wall_run_normal = new_wall.get_normal()
+        else:
+            wall_run_time = max(0.0, wall_run_time - delta * 2.0)
+    _apply_wall_tilt(delta)
     apply_crouch(delta, is_crouching)
     apply_headbob(delta, direction)
     if not was_grounded and is_on_floor():
@@ -328,6 +362,17 @@ func apply_step_assist(direction: Vector3):
         if not test_move(raised, motion):
             global_transform = raised
             velocity.y = 0.0
+
+func _get_wall_collision() -> KinematicCollision3D:
+    for i in range(get_slide_collision_count()):
+        var collision := get_slide_collision(i)
+        if collision and abs(collision.get_normal().y) < 0.2:
+            return collision
+    return null
+
+func _apply_wall_tilt(delta: float):
+    var target_tilt := deg_to_rad(wall_tilt_target)
+    head.rotation.z = lerp(head.rotation.z, target_tilt, wall_run_tilt_speed * delta)
 
 func apply_headbob(delta: float, _direction: Vector3):
     var horizontal_speed = Vector2(velocity.x, velocity.z).length()
