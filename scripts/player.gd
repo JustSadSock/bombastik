@@ -259,8 +259,7 @@ func spawn_projectile(direction: Vector3, weapon_data: Dictionary):
         return
     var projectile = projectile_scene.instantiate()
     var spawn_origin := muzzle.global_transform.origin
-    var projectile_basis := Basis()
-    projectile_basis = projectile_basis.looking_at(direction.normalized(), Vector3.UP)
+    var projectile_basis := Basis.looking_at(direction.normalized(), Vector3.UP)
     projectile.global_transform = Transform3D(projectile_basis, spawn_origin)
     projectile.set("velocity", direction * weapon_data.get("projectile_speed", 40.0))
     projectile.set("damage", weapon_data.get("damage", 10.0))

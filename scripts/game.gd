@@ -46,6 +46,7 @@ func _ready():
     height_noise.seed = randi()
     height_noise.frequency = 0.07
     height_noise.fractal_octaves = 3
+    _ensure_default_input()
     tile_scene = tile_scene if tile_scene else DEFAULT_TILE_SCENE
     player_scene = player_scene if player_scene else DEFAULT_PLAYER_SCENE
     enemy_scene = enemy_scene if enemy_scene else DEFAULT_ENEMY_SCENE
@@ -57,6 +58,48 @@ func _ready():
         start_round()
     else:
         Input.set_mouse_mode(Input.MOUSE_MODE_VISIBLE)
+
+func _ensure_default_input():
+    _ensure_action("move_forward", [_key(KEY_W), _key(KEY_UP), _joy_axis(1, -1.0)])
+    _ensure_action("move_backward", [_key(KEY_S), _key(KEY_DOWN), _joy_axis(1, 1.0)])
+    _ensure_action("move_left", [_key(KEY_A), _key(KEY_LEFT), _joy_axis(0, -1.0)])
+    _ensure_action("move_right", [_key(KEY_D), _key(KEY_RIGHT), _joy_axis(0, 1.0)])
+    _ensure_action("jump", [_key(KEY_SPACE), _joy_button(0)])
+    _ensure_action("fire", [_mouse_button(MOUSE_BUTTON_LEFT), _mouse_button(MOUSE_BUTTON_RIGHT)])
+    _ensure_action("switch_next", [_key(KEY_Q), _mouse_button(MOUSE_BUTTON_WHEEL_UP)])
+    _ensure_action("switch_prev", [_key(KEY_E), _mouse_button(MOUSE_BUTTON_WHEEL_DOWN)])
+    _ensure_action("sprint", [_key(KEY_SHIFT)])
+    _ensure_action("crouch", [_key(KEY_CTRL), _key(KEY_C)])
+
+func _ensure_action(name: String, events: Array):
+    if InputMap.has_action(name):
+        return
+    InputMap.add_action(name)
+    for event in events:
+        if event:
+            InputMap.action_add_event(name, event)
+
+func _key(code: int) -> InputEventKey:
+    var ev := InputEventKey.new()
+    ev.keycode = code
+    ev.physical_keycode = code
+    return ev
+
+func _mouse_button(index: int) -> InputEventMouseButton:
+    var ev := InputEventMouseButton.new()
+    ev.button_index = index
+    return ev
+
+func _joy_button(index: int) -> InputEventJoypadButton:
+    var ev := InputEventJoypadButton.new()
+    ev.button_index = index
+    return ev
+
+func _joy_axis(axis: int, sign: float) -> InputEventJoypadMotion:
+    var ev := InputEventJoypadMotion.new()
+    ev.axis = axis
+    ev.axis_value = sign
+    return ev
 
 func start_round():
     game_over = false
@@ -558,13 +601,16 @@ func get_random_floor_position(min_distance := 0.0) -> Vector3:
         return Vector3.ZERO
     var attempts := 0
     while attempts < 12:
-        var candidate = pool[rng.randi_range(0, pool.size() - 1)]
+        var candidate: Vector3 = pool[rng.randi_range(0, pool.size() - 1)]
+        candidate.y = _sample_height_interpolated(height_map, candidate) + 0.9
         if not is_instance_valid(player) or min_distance <= 0.0:
             return candidate
         if candidate.distance_to(player.global_transform.origin) >= min_distance:
             return candidate
         attempts += 1
-    return pool[0]
+    var fallback: Vector3 = pool[0]
+    fallback.y = _sample_height_interpolated(height_map, fallback) + 0.9
+    return fallback
 
 func _unhandled_input(event):
     var wants_pause: bool = event.is_action_pressed("ui_cancel")
