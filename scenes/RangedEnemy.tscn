@@ -1,4 +1,4 @@
-[gd_scene load_steps=11 format=3]
+[gd_scene load_steps=12 format=3]
 
 [ext_resource type="Script" path="res://scripts/enemy.gd" id="1"]
 [ext_resource type="Material" path="res://materials/enemy_ranged_material.tres" id="2"]
@@ -25,6 +25,10 @@ bottom_radius = 0.32
 albedo_color = Color(0.08, 0.1, 0.16, 1)
 roughness = 0.48
 metallic = 0.36
+
+[sub_resource type="SphereMesh" id="6"]
+radius = 0.3
+height = 0.2
 
 [node name="Enemy" type="CharacterBody3D"]
 script = ExtResource( 1 )
@@ -60,6 +64,11 @@ material_override = ExtResource( 2 )
 [node name="Visor" type="MeshInstance3D" parent="Visual"]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.22, -0.38)
 mesh = SubResource( 3 )
+material_override = ExtResource( 3 )
+
+[node name="Core" type="MeshInstance3D" parent="Visual"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.86, -0.26)
+mesh = SubResource( 6 )
 material_override = ExtResource( 3 )
 
 [node name="Harness" type="MeshInstance3D" parent="Visual"]
