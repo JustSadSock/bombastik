@@ -7,7 +7,7 @@ const DEFAULT_ENEMY_SCENE := preload("res://scenes/Enemy.tscn")
 const DEFAULT_RANGED_ENEMY_SCENE := preload("res://scenes/RangedEnemy.tscn")
 const DEFAULT_PICKUP_SCENE := preload("res://scenes/WeaponPickup.tscn")
 
-@export var grid_size := Vector2i(14, 14)
+@export var grid_size := Vector2i(20, 20)
 @export var tile_size := 6.5
 @export var tile_height_variation := 1.2
 @export var cover_chance := 0.18
@@ -126,8 +126,9 @@ func clear_game():
 
 func generate_level():
     height_map = _build_flat_height_map()
-    height_range = Vector2.ZERO
+    height_range = Vector2(0.0, 8.0)
     _build_flat_floor()
+    _add_boundary_walls(height_range)
     _record_flat_spawns()
 
 func _build_flat_height_map() -> Array:
@@ -197,7 +198,7 @@ func _add_boundary_walls(range: Vector2):
     var boundary := Node3D.new()
     boundary.name = "Boundary"
 
-    var max_height := range.y + 3.5
+    var max_height: float = max(range.y + 4.0, 8.0)
     var thickness := tile_size * 0.6
     var length_x := grid_size.x * tile_size + thickness * 2.0
     var length_z := grid_size.y * tile_size + thickness * 2.0
@@ -208,6 +209,22 @@ func _add_boundary_walls(range: Vector2):
     _create_wall_segment(boundary, Vector3(length_x, max_height, thickness), Vector3(center_x, 0, grid_size.y * tile_size + thickness * 0.5))
     _create_wall_segment(boundary, Vector3(thickness, max_height, length_z), Vector3(-thickness * 0.5, 0, center_z))
     _create_wall_segment(boundary, Vector3(thickness, max_height, length_z), Vector3(grid_size.x * tile_size + thickness * 0.5, 0, center_z))
+
+    var ceiling := StaticBody3D.new()
+    ceiling.name = "Ceiling"
+    var ceiling_mesh := BoxMesh.new()
+    ceiling_mesh.size = Vector3(length_x, thickness, length_z)
+    var ceiling_instance := MeshInstance3D.new()
+    ceiling_instance.mesh = ceiling_mesh
+    ceiling_instance.position = Vector3(center_x, max_height + thickness * 0.5, center_z)
+    var ceiling_collider := CollisionShape3D.new()
+    var ceiling_shape := BoxShape3D.new()
+    ceiling_shape.size = ceiling_mesh.size
+    ceiling_collider.shape = ceiling_shape
+    ceiling_collider.position = ceiling_instance.position
+    ceiling.add_child(ceiling_instance)
+    ceiling.add_child(ceiling_collider)
+    boundary.add_child(ceiling)
 
     level_root.add_child(boundary)
 
