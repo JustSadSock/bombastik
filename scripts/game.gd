@@ -2,12 +2,10 @@ extends Node3D
 
 const WeaponData = preload("res://scripts/weapon_data.gd")
 
-const DEFAULT_TILE_SCENE := preload("res://scenes/LevelTile.tscn")
 const DEFAULT_PLAYER_SCENE := preload("res://scenes/Player.tscn")
 const DEFAULT_ENEMY_SCENE := preload("res://scenes/Enemy.tscn")
 const DEFAULT_RANGED_ENEMY_SCENE := preload("res://scenes/RangedEnemy.tscn")
 const DEFAULT_PICKUP_SCENE := preload("res://scenes/WeaponPickup.tscn")
-const TILE_MATERIAL := preload("res://materials/tile_material.tres")
 
 @export var grid_size := Vector2i(14, 14)
 @export var tile_size := 6.5
@@ -15,7 +13,6 @@ const TILE_MATERIAL := preload("res://materials/tile_material.tres")
 @export var cover_chance := 0.18
 @export var vertical_feature_chance := 0.22
 @export var auto_start := false
-@export var tile_scene: PackedScene = DEFAULT_TILE_SCENE
 @export var player_scene: PackedScene = DEFAULT_PLAYER_SCENE
 @export var enemy_scene: PackedScene = DEFAULT_ENEMY_SCENE
 @export var ranged_enemy_scene: PackedScene = DEFAULT_RANGED_ENEMY_SCENE
@@ -47,7 +44,6 @@ func _ready():
     height_noise.frequency = 0.07
     height_noise.fractal_octaves = 3
     _ensure_default_input()
-    tile_scene = tile_scene if tile_scene else DEFAULT_TILE_SCENE
     player_scene = player_scene if player_scene else DEFAULT_PLAYER_SCENE
     enemy_scene = enemy_scene if enemy_scene else DEFAULT_ENEMY_SCENE
     ranged_enemy_scene = ranged_enemy_scene if ranged_enemy_scene else DEFAULT_RANGED_ENEMY_SCENE
@@ -71,13 +67,13 @@ func _ensure_default_input():
     _ensure_action("sprint", [_key(KEY_SHIFT)])
     _ensure_action("crouch", [_key(KEY_CTRL), _key(KEY_C)])
 
-func _ensure_action(name: String, events: Array):
-    if InputMap.has_action(name):
+func _ensure_action(action_name: String, events: Array):
+    if InputMap.has_action(action_name):
         return
-    InputMap.add_action(name)
+    InputMap.add_action(action_name)
     for event in events:
         if event:
-            InputMap.action_add_event(name, event)
+            InputMap.action_add_event(action_name, event)
 
 func _key(code: int) -> InputEventKey:
     var ev := InputEventKey.new()
@@ -129,40 +125,51 @@ func clear_game():
         player.queue_free()
 
 func generate_level():
-    height_map = _build_height_map()
-    height_range = _calculate_height_range(height_map)
-    _build_smooth_floor(height_map)
-    _add_boundary_walls(height_range)
-    for x in range(grid_size.x):
-        for y in range(grid_size.y):
-            var tile = tile_scene.instantiate()
-            var height_offset = height_map[x][y]
-            tile.position = Vector3(x * tile_size, height_offset, y * tile_size)
-            tile.rotation_degrees.y = rng.randf_range(-1.2, 1.2)
-            _prepare_tile_visuals(tile, height_offset, x, y)
-            level_root.add_child(tile)
-            _record_floor_spot(height_offset, x, y)
-            _maybe_add_cover(tile)
-            _maybe_add_vertical_feature(tile)
-            _decorate_tile(tile, height_offset, x, y)
+    height_map = _build_flat_height_map()
+    height_range = Vector2.ZERO
+    _build_flat_floor()
+    _record_flat_spawns()
 
-func _build_smooth_floor(heights: Array):
-    var mesh := _generate_floor_mesh(heights)
+func _build_flat_height_map() -> Array:
+    var heights: Array = []
+    for x in range(grid_size.x):
+        heights.append([])
+        for y in range(grid_size.y):
+            heights[x].append(0.0)
+    return heights
+
+func _record_flat_spawns():
+    floor_positions.clear()
+    spawn_positions.clear()
+    var center := Vector3(grid_size.x * tile_size * 0.5, 0.0, grid_size.y * tile_size * 0.5)
+    floor_positions.append(center + Vector3(0, 0.55, 0))
+    spawn_positions.append(center + Vector3(0, 0.9, 0))
+
+func _build_flat_floor():
     var floor_body := StaticBody3D.new()
-    floor_body.name = "UnifiedFloor"
+    floor_body.name = "FlatFloor"
 
     var mesh_instance := MeshInstance3D.new()
+    var mesh := BoxMesh.new()
+    var length_x := grid_size.x * tile_size
+    var length_z := grid_size.y * tile_size
+    var thickness := 1.0
+    mesh.size = Vector3(length_x, thickness, length_z)
     mesh_instance.mesh = mesh
-    mesh_instance.material_override = TILE_MATERIAL
+    mesh_instance.material_override = preload("res://materials/tile_material.tres")
+    mesh_instance.position = Vector3(length_x * 0.5, -thickness * 0.5, length_z * 0.5)
     floor_body.add_child(mesh_instance)
 
     var collider := CollisionShape3D.new()
-    collider.shape = mesh.create_trimesh_shape()
+    var shape := BoxShape3D.new()
+    shape.size = mesh.size
+    collider.shape = shape
+    collider.position = mesh_instance.position
     floor_body.add_child(collider)
 
     level_root.add_child(floor_body)
 
-func _create_wall_segment(root: Node3D, size: Vector3, position: Vector3):
+func _create_wall_segment(root: Node3D, size: Vector3, wall_position: Vector3):
     var wall := StaticBody3D.new()
     var mesh_instance := MeshInstance3D.new()
     var mesh := BoxMesh.new()
@@ -183,7 +190,7 @@ func _create_wall_segment(root: Node3D, size: Vector3, position: Vector3):
     collider.position.y = size.y * 0.5
     wall.add_child(collider)
 
-    wall.position = position
+    wall.position = wall_position
     root.add_child(wall)
 
 func _add_boundary_walls(range: Vector2):
@@ -565,26 +572,10 @@ func spawn_player():
         hud.update_health(player.max_health, player.max_health)
 
 func spawn_pickups():
-    for data in WeaponData.WEAPONS:
-        if data.get("id") == "pistol":
-            continue
-        var pickup = pickup_scene.instantiate()
-        pickup.weapon_id = data.get("id")
-        pickup.display_name = data.get("name")
-        var pickup_position = get_random_floor_position() + Vector3(0, 0.5, 0)
-        var label = pickup.get_node_or_null("Label3D")
-        if label:
-            label.text = data.get("name")
-        pickup_root.add_child(pickup)
-        pickup.global_transform.origin = pickup_position
+    pass
 
 func spawn_enemies():
-    var melee_count := 6
-    var ranged_count := 4
-    for i in range(melee_count):
-        _spawn_enemy(enemy_scene)
-    for i in range(ranged_count):
-        _spawn_enemy(ranged_enemy_scene)
+    pass
 
 func _spawn_enemy(scene: PackedScene):
     if scene == null:
