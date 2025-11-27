@@ -6,6 +6,9 @@ const DEFAULT_PLAYER_SCENE := preload("res://scenes/Player.tscn")
 const DEFAULT_ENEMY_SCENE := preload("res://scenes/Enemy.tscn")
 const DEFAULT_RANGED_ENEMY_SCENE := preload("res://scenes/RangedEnemy.tscn")
 const DEFAULT_PICKUP_SCENE := preload("res://scenes/WeaponPickup.tscn")
+const FIRE_LOOP := preload("res://audio/fire_sine.tres")
+const HURT_TONE := preload("res://audio/hurt_sine.tres")
+const STEP_TONE := preload("res://audio/step_sine.tres")
 
 @export var grid_size := Vector2i(20, 20)
 @export var tile_size := 6.5
@@ -96,6 +99,23 @@ func _joy_axis(axis: int, sign: float) -> InputEventJoypadMotion:
     ev.axis = axis
     ev.axis_value = sign
     return ev
+
+func _make_looping_player(stream: AudioStream, volume_db := -8.0, pitch_scale := 1.0, max_distance := 40.0, autoplay := true) -> AudioStreamPlayer3D:
+    var player := AudioStreamPlayer3D.new()
+    player.stream = stream
+    player.volume_db = volume_db
+    player.pitch_scale = pitch_scale
+    player.max_distance = max_distance
+    player.autoplay = autoplay
+    return player
+
+func _add_light_flicker(light: Light3D, base_energy: float, variance: float, period := 0.75):
+    if not light:
+        return
+    light.light_energy = base_energy
+    var flicker := create_tween().set_loops()
+    flicker.tween_property(light, "light_energy", base_energy + variance, period * rng.randf_range(0.45, 0.8)).set_trans(Tween.TRANS_SINE)
+    flicker.tween_property(light, "light_energy", base_energy - variance * 0.6, period * rng.randf_range(0.45, 0.8)).set_trans(Tween.TRANS_SINE)
 
 func start_round():
     game_over = false
@@ -214,12 +234,12 @@ func _build_factory_blockout():
 
 func _make_factory_floor_material() -> StandardMaterial3D:
     var mat := StandardMaterial3D.new()
-    mat.albedo_color = Color(0.16, 0.2, 0.24)
-    mat.metallic = 0.18
-    mat.roughness = 0.48
+    mat.albedo_color = Color(0.12, 0.17, 0.22)
+    mat.metallic = 0.26
+    mat.roughness = 0.44
     mat.emission_enabled = true
-    mat.emission = Color(0.12, 0.15, 0.18)
-    mat.emission_energy_multiplier = 0.9
+    mat.emission = Color(0.08, 0.1, 0.14)
+    mat.emission_energy_multiplier = 1.1
     return mat
 
 func _make_accent_material(color: Color, emission_strength := 1.0) -> StandardMaterial3D:
@@ -364,6 +384,21 @@ func _create_conveyor_belt(def: Dictionary, accent_material: StandardMaterial3D,
     arrow.rotation_degrees.y = rad_to_deg(atan2(direction.x, direction.z))
     root.add_child(arrow)
 
+    var belt_spot := SpotLight3D.new()
+    belt_spot.light_color = Color(1.0, 0.42, 0.26)
+    belt_spot.light_energy = 3.0
+    belt_spot.inner_angle = 18.0
+    belt_spot.outer_angle = 46.0
+    belt_spot.spot_range = max(size.x, size.y) * 0.9
+    belt_spot.position = Vector3(0, 3.0, 0)
+    belt_spot.look_at(direction.normalized() * 3.0, Vector3.UP)
+    _add_light_flicker(belt_spot, 3.0, 0.9, 0.7)
+    root.add_child(belt_spot)
+
+    var conveyor_audio := _make_looping_player(FIRE_LOOP, -9.0, 0.75, 48.0)
+    conveyor_audio.position = Vector3(0, 1.4, 0)
+    root.add_child(conveyor_audio)
+
     var area := Area3D.new()
     area.name = "%s_Area" % name
     area.gravity_space_override = Area3D.SPACE_OVERRIDE_REPLACE
@@ -465,9 +500,30 @@ func _create_press(def: Dictionary, accent_material: StandardMaterial3D):
     warning_light.position = Vector3(0, head_instance.position.y + 0.4, 0)
     root.add_child(warning_light)
 
+    var press_spot := SpotLight3D.new()
+    press_spot.light_color = Color(1.0, 0.28, 0.16)
+    press_spot.light_energy = 3.6
+    press_spot.inner_angle = 20.0
+    press_spot.outer_angle = 48.0
+    press_spot.spot_range = max(size.x, size.y) * 1.4
+    press_spot.position = Vector3(0, 4.0, 0)
+    press_spot.look_at(Vector3(0, 2.0, 0), Vector3.UP)
+    _add_light_flicker(press_spot, 3.6, 1.2, 0.62)
+    root.add_child(press_spot)
+
+    var hydraulic_hum := _make_looping_player(FIRE_LOOP, -8.0, 0.55, 36.0)
+    hydraulic_hum.position = Vector3(0, 1.4, 0)
+    root.add_child(hydraulic_hum)
+
+    var slam_clang := _make_looping_player(HURT_TONE, -4.5, 0.9, 28.0, false)
+    slam_clang.position = Vector3(0, 1.0, 0)
+    root.add_child(slam_clang)
+    _add_light_flicker(warning_light, warning_light.light_energy, 1.0, 0.7)
+
     var press_tween := create_tween().set_loops()
     press_tween.tween_property(head, "position:y", 0.4 + depth * 0.1, cycle * 0.32).set_delay(0.2)
     press_tween.tween_callback(func(): warning_light.light_energy = 3.2)
+    press_tween.tween_callback(func(): slam_clang.play())
     press_tween.tween_property(head, "position:y", -depth, cycle * 0.18).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_IN)
     press_tween.tween_callback(func(): warning_light.light_energy = 1.2)
     press_tween.tween_property(head, "position:y", 3.5, cycle * 0.35).set_trans(Tween.TRANS_EXPO).set_ease(Tween.EASE_OUT)
@@ -551,8 +607,13 @@ func _create_robotic_arm(def: Dictionary, accent_material: StandardMaterial3D):
     var tween := create_tween().set_loops()
     var duration: float = max(2.6, span.length() * 0.14)
     arm.position = start - mid
+    var arc_sound := _make_looping_player(STEP_TONE, -6.0, 1.2, 28.0, false)
+    arc_sound.position = Vector3(0, 1.0, 0)
+    root.add_child(arc_sound)
     tween.tween_property(arm, "position", end - mid + Vector3(0, 0.2, 0), duration).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+    tween.tween_callback(func(): arc_sound.play())
     tween.tween_property(arm, "position", start - mid, duration * 0.9).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+    tween.tween_callback(func(): arc_sound.play())
     tween.tween_interval(0.35)
 
     var light := OmniLight3D.new()
@@ -561,6 +622,35 @@ func _create_robotic_arm(def: Dictionary, accent_material: StandardMaterial3D):
     light.omni_range = 8.0
     light.position = Vector3(0, 1.1, 0)
     arm.add_child(light)
+    _add_light_flicker(light, light.light_energy, 0.6, 0.55)
+
+    var arc_particles := CPUParticles3D.new()
+    arc_particles.amount = 22
+    arc_particles.lifetime = 0.4
+    arc_particles.preprocess = 0.2
+    arc_particles.emitting = true
+    arc_particles.one_shot = false
+    arc_particles.direction = Vector3(0.2, 1.0, 0)
+    arc_particles.gravity = Vector3(0, -1.4, 0)
+    arc_particles.spread = 0.8
+    arc_particles.initial_velocity_min = 6.0
+    arc_particles.initial_velocity_max = 10.0
+    arc_particles.scale_amount_min = 0.05
+    arc_particles.scale_amount_max = 0.18
+    arc_particles.color = Color(1.0, 0.56, 0.34, 0.8)
+    arc_particles.position = Vector3(0, 0.7, 0)
+    arm.add_child(arc_particles)
+
+    var travel_spot := SpotLight3D.new()
+    travel_spot.light_color = Color(1.0, 0.36, 0.2)
+    travel_spot.light_energy = 2.8
+    travel_spot.spot_range = span.length() * 1.2
+    travel_spot.inner_angle = 16.0
+    travel_spot.outer_angle = 36.0
+    travel_spot.position = Vector3(0, 3.6, 0)
+    travel_spot.look_at(Vector3(0, 1.0, 0) + span.normalized(), Vector3.UP)
+    _add_light_flicker(travel_spot, travel_spot.light_energy, 0.8, 0.68)
+    root.add_child(travel_spot)
 
     level_root.add_child(root)
 
@@ -601,6 +691,22 @@ func _create_furnace(def: Dictionary, accent_material: StandardMaterial3D, secon
     stack.material_override = stack_mat
     stack.position = Vector3(0, stack_mesh.height * 0.5, 0)
     root.add_child(stack)
+
+    var furnace_light := OmniLight3D.new()
+    furnace_light.light_color = Color(1.0, 0.36, 0.16)
+    furnace_light.light_energy = 3.0
+    furnace_light.omni_range = height * 0.9
+    furnace_light.position = Vector3(0, height * 0.45, 0)
+    _add_light_flicker(furnace_light, furnace_light.light_energy, 1.4, 0.64)
+    root.add_child(furnace_light)
+
+    var siren := _make_looping_player(HURT_TONE, -12.0, 0.58, 60.0)
+    siren.position = Vector3(0, height * 0.6, 0)
+    root.add_child(siren)
+
+    var heat_rumble := _make_looping_player(FIRE_LOOP, -8.5, 0.92, 46.0)
+    heat_rumble.position = Vector3(0, 0.6, 0)
+    root.add_child(heat_rumble)
 
     var air_area := Area3D.new()
     air_area.gravity_space_override = Area3D.SPACE_OVERRIDE_COMBINE_REPLACE
