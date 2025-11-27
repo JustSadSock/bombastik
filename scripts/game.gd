@@ -119,7 +119,7 @@ func _add_light_flicker(light: Light3D, base_energy: float, variance: float, per
     if not light:
         return
     light.light_energy = base_energy
-    var flicker := create_tween().set_loops()
+    var flicker := light.create_tween().set_loops()
     flicker.tween_property(light, "light_energy", base_energy + variance, period * rng.randf_range(0.45, 0.8)).set_trans(Tween.TRANS_SINE)
     flicker.tween_property(light, "light_energy", base_energy - variance * 0.6, period * rng.randf_range(0.45, 0.8)).set_trans(Tween.TRANS_SINE)
 
@@ -464,7 +464,7 @@ func _create_conveyor_belt(def: Dictionary, accent_material: StandardMaterial3D,
     belt_spot.spot_angle = 46.0
     belt_spot.spot_range = max(size.x, size.y) * 0.9
     belt_spot.position = Vector3(0, 3.0, 0)
-    belt_spot.look_at(direction.normalized() * 3.0, Vector3.UP)
+    belt_spot.look_at_from_position(belt_spot.position, belt_spot.position + direction.normalized() * 3.0, Vector3.UP)
     _add_light_flicker(belt_spot, 3.0, 0.9, 0.7)
     root.add_child(belt_spot)
 
@@ -585,7 +585,7 @@ func _create_press(def: Dictionary, accent_material: StandardMaterial3D):
     press_spot.spot_angle = 48.0
     press_spot.spot_range = max(size.x, size.y) * 1.4
     press_spot.position = Vector3(0, 4.0, 0)
-    press_spot.look_at(Vector3(0, 2.0, 0), Vector3.UP)
+    press_spot.look_at_from_position(press_spot.position, Vector3(0, 2.0, 0), Vector3.UP)
     _add_light_flicker(press_spot, 3.6, 1.2, 0.62)
     root.add_child(press_spot)
 
@@ -601,7 +601,7 @@ func _create_press(def: Dictionary, accent_material: StandardMaterial3D):
     var press_nav := _make_local_nav_region("%sNavGate" % name, Rect2(-size.x * 0.35, -size.y * 0.35, size.x * 0.7, size.y * 0.7))
     root.add_child(press_nav)
 
-    var press_tween := create_tween().set_loops()
+    var press_tween := root.create_tween().set_loops()
     press_tween.tween_property(head, "position:y", 0.4 + depth * 0.1, cycle * 0.32).set_delay(0.2)
     press_tween.tween_callback(func(): press_nav.enabled = true)
     press_tween.tween_callback(func(): warning_light.light_energy = 3.2)
@@ -637,7 +637,7 @@ func _create_robotic_arm(def: Dictionary, accent_material: StandardMaterial3D):
     rail_mesh.size = Vector3(span.length(), 0.3, 0.5)
     rail.mesh = rail_mesh
     rail.position = Vector3.ZERO
-    rail.look_at(span)
+    rail.look_at_from_position(rail.position, span, Vector3.UP)
     var rail_material := StandardMaterial3D.new()
     rail_material.albedo_color = Color(0.18, 0.21, 0.25)
     rail_material.metallic = 0.2
@@ -688,7 +688,7 @@ func _create_robotic_arm(def: Dictionary, accent_material: StandardMaterial3D):
     arm.add_child(launch_area)
     root.add_child(arm)
 
-    var tween := create_tween().set_loops()
+    var tween := root.create_tween().set_loops()
     var duration: float = max(2.6, span.length() * 0.14)
     arm.position = start - mid
     var arc_sound := _make_looping_player(STEP_TONE, -6.0, 1.2, 28.0, false)
@@ -733,7 +733,7 @@ func _create_robotic_arm(def: Dictionary, accent_material: StandardMaterial3D):
     travel_spot.spot_range = span.length() * 1.2
     travel_spot.spot_angle = 36.0
     travel_spot.position = Vector3(0, 3.6, 0)
-    travel_spot.look_at(Vector3(0, 1.0, 0) + span.normalized(), Vector3.UP)
+    travel_spot.look_at_from_position(travel_spot.position, travel_spot.position + Vector3(0, 1.0, 0) + span.normalized(), Vector3.UP)
     _add_light_flicker(travel_spot, travel_spot.light_energy, 0.8, 0.68)
     root.add_child(travel_spot)
 
@@ -961,7 +961,10 @@ func _add_factory_fx(playfield: Vector2):
             p.color = Color(1.0, 0.54, 0.26, 0.9)
             return p
         )
-        sparks.reparent(level_root)
+        if sparks.get_parent():
+            sparks.reparent(level_root)
+        else:
+            level_root.add_child(sparks)
         sparks.amount = 60
         sparks.position = pos
         sparks.emitting = true
@@ -982,7 +985,10 @@ func _add_factory_fx(playfield: Vector2):
             p.color = Color(0.15, 0.16, 0.18, 0.6)
             return p
         )
-        smoke.reparent(level_root)
+        if smoke.get_parent():
+            smoke.reparent(level_root)
+        else:
+            level_root.add_child(smoke)
         smoke.amount = 22
         smoke.position = pos + Vector3(0.4, 0.1, 0)
         smoke.emitting = true
