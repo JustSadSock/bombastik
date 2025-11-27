@@ -94,32 +94,65 @@ func generate_level():
             _maybe_add_vertical_feature(tile)
             _decorate_tile(tile, height_offset, x, y)
 
+func _blur_heights(values: Array, passes: int) -> Array:
+    var current := values.duplicate(true)
+    var kernel := [[1.0, 2.0, 1.0], [2.0, 4.0, 2.0], [1.0, 2.0, 1.0]]
+    var kernel_sum := 0.0
+    for row in kernel:
+        for weight in row:
+            kernel_sum += weight
+    for i in range(passes):
+        var blurred: Array = []
+        for x in range(grid_size.x):
+            blurred.append([])
+            for y in range(grid_size.y):
+                var acc := 0.0
+                for ox in range(-1, 2):
+                    for oy in range(-1, 2):
+                        var nx = clamp(x + ox, 0, grid_size.x - 1)
+                        var ny = clamp(y + oy, 0, grid_size.y - 1)
+                        acc += current[nx][ny] * kernel[ox + 1][oy + 1]
+                blurred[x].append(acc / kernel_sum)
+        current = blurred
+    return current
+
+func _soften_gradients(values: Array, max_delta: float, passes: int) -> Array:
+    var current := values.duplicate(true)
+    for i in range(passes):
+        var softened: Array = []
+        for x in range(grid_size.x):
+            softened.append([])
+            for y in range(grid_size.y):
+                var base_height: float = current[x][y]
+                var total := base_height * 2.0
+                var count := 2.0
+                for ox in range(-1, 2):
+                    for oy in range(-1, 2):
+                        if ox == 0 and oy == 0:
+                            continue
+                        var nx = clamp(x + ox, 0, grid_size.x - 1)
+                        var ny = clamp(y + oy, 0, grid_size.y - 1)
+                        var neighbour_height: float = current[nx][ny]
+                        var limited_height = clamp(neighbour_height, base_height - max_delta, base_height + max_delta)
+                        total += limited_height
+                        count += 1.0
+                softened[x].append(total / count)
+        current = softened
+    return current
+
 func _build_height_map() -> Array:
     var heights: Array = []
     for x in range(grid_size.x):
         heights.append([])
         for y in range(grid_size.y):
-            var primary = height_noise.get_noise_2d(x, y) * tile_height_variation * 0.75
-            var ridges = height_noise.get_noise_2d(x * 0.35, y * 0.35) * tile_height_variation * 0.4
-            var waves = sin(x * 0.32) * 0.12 + cos(y * 0.28) * 0.1
-            heights[x].append(primary + ridges + waves)
-    for i in range(2):
-        var smoothed: Array = []
-        for x in range(grid_size.x):
-            smoothed.append([])
-            for y in range(grid_size.y):
-                var acc: float = float(heights[x][y]) * 3.0
-                var count: float = 3.0
-                for ox in range(-1, 2):
-                    for oy in range(-1, 2):
-                        var nx = x + ox
-                        var ny = y + oy
-                        if nx < 0 or ny < 0 or nx >= grid_size.x or ny >= grid_size.y or (ox == 0 and oy == 0):
-                            continue
-                        acc += heights[nx][ny]
-                        count += 1.0
-                smoothed[x].append(acc / count)
-        heights = smoothed
+            var slow_waves = sin(x * 0.12) * 0.25 + cos(y * 0.11) * 0.22
+            var base = height_noise.get_noise_2d(x * 0.18, y * 0.18) * tile_height_variation * 0.7
+            var details = height_noise.get_noise_2d((x + 23) * 0.42, (y - 17) * 0.42) * tile_height_variation * 0.25
+            heights[x].append(base + details + slow_waves)
+
+    heights = _blur_heights(heights, 3)
+    var max_step := tile_height_variation * 0.35
+    heights = _soften_gradients(heights, max_step, 2)
     return heights
 
 func _tint_tile(tile: Node, height_offset: float, x: int, y: int):
