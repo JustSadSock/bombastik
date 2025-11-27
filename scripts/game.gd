@@ -7,6 +7,7 @@ const DEFAULT_PLAYER_SCENE := preload("res://scenes/Player.tscn")
 const DEFAULT_ENEMY_SCENE := preload("res://scenes/Enemy.tscn")
 const DEFAULT_RANGED_ENEMY_SCENE := preload("res://scenes/RangedEnemy.tscn")
 const DEFAULT_PICKUP_SCENE := preload("res://scenes/WeaponPickup.tscn")
+const TILE_MATERIAL := preload("res://materials/tile_material.tres")
 
 @export var grid_size := Vector2i(14, 14)
 @export var tile_size := 6.5
@@ -81,18 +82,35 @@ func clear_game():
 
 func generate_level():
     var heights := _build_height_map()
+    _build_smooth_floor(heights)
     for x in range(grid_size.x):
         for y in range(grid_size.y):
             var tile = tile_scene.instantiate()
             var height_offset = heights[x][y]
             tile.position = Vector3(x * tile_size, height_offset, y * tile_size)
             tile.rotation_degrees.y = rng.randf_range(-1.2, 1.2)
-            _tint_tile(tile, height_offset, x, y)
+            _prepare_tile_visuals(tile, height_offset, x, y)
             level_root.add_child(tile)
-            floor_positions.append(tile.global_transform.origin + Vector3(0, 0.55, 0))
+            floor_positions.append(Vector3(tile.position.x, height_offset + 0.55, tile.position.z))
             _maybe_add_cover(tile)
             _maybe_add_vertical_feature(tile)
             _decorate_tile(tile, height_offset, x, y)
+
+func _build_smooth_floor(heights: Array):
+    var mesh := _generate_floor_mesh(heights)
+    var floor_body := StaticBody3D.new()
+    floor_body.name = "UnifiedFloor"
+
+    var mesh_instance := MeshInstance3D.new()
+    mesh_instance.mesh = mesh
+    mesh_instance.material_override = TILE_MATERIAL
+    floor_body.add_child(mesh_instance)
+
+    var collider := CollisionShape3D.new()
+    collider.shape = mesh.create_trimesh_shape()
+    floor_body.add_child(collider)
+
+    level_root.add_child(floor_body)
 
 func _blur_heights(values: Array, passes: int) -> Array:
     var current := values.duplicate(true)
@@ -155,10 +173,66 @@ func _build_height_map() -> Array:
     heights = _soften_gradients(heights, max_step, 2)
     return heights
 
+func _sample_height(heights: Array, ix: int, iy: int) -> float:
+    var sx = clamp(ix, 0, grid_size.x - 1)
+    var sy = clamp(iy, 0, grid_size.y - 1)
+    return heights[sx][sy]
+
+func _generate_floor_mesh(heights: Array) -> ArrayMesh:
+    var vertex_columns := grid_size.x + 1
+    var vertex_rows := grid_size.y + 1
+    var vertices := PackedVector3Array()
+    var normals := PackedVector3Array()
+    var uvs := PackedVector2Array()
+
+    for y in range(vertex_rows):
+        for x in range(vertex_columns):
+            var height = _sample_height(heights, x, y)
+            vertices.append(Vector3(x * tile_size, height, y * tile_size))
+
+            var left = _sample_height(heights, x - 1, y)
+            var right = _sample_height(heights, x + 1, y)
+            var down = _sample_height(heights, x, y - 1)
+            var up = _sample_height(heights, x, y + 1)
+            var normal := Vector3(left - right, 2.0, down - up).normalized()
+            normals.append(normal)
+
+            uvs.append(Vector2(float(x) / max(1, vertex_columns - 1), float(y) / max(1, vertex_rows - 1)))
+
+    var indices := PackedInt32Array()
+    for y in range(vertex_rows - 1):
+        for x in range(vertex_columns - 1):
+            var top_left := y * vertex_columns + x
+            var top_right := top_left + 1
+            var bottom_left := top_left + vertex_columns
+            var bottom_right := bottom_left + 1
+
+            indices.append_array([top_left, bottom_left, top_right])
+            indices.append_array([top_right, bottom_left, bottom_right])
+
+    var mesh := ArrayMesh.new()
+    var arrays := []
+    arrays.resize(Mesh.ARRAY_MAX)
+    arrays[Mesh.ARRAY_VERTEX] = vertices
+    arrays[Mesh.ARRAY_NORMAL] = normals
+    arrays[Mesh.ARRAY_TEX_UV] = uvs
+    arrays[Mesh.ARRAY_INDEX] = indices
+    mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arrays)
+    return mesh
+
 func _tint_tile(tile: Node, height_offset: float, x: int, y: int):
     var mesh_instance: MeshInstance3D = tile.get_node_or_null("MeshInstance3D")
     if mesh_instance:
         mesh_instance.material_override = _make_tile_material(height_offset, x, y)
+
+func _prepare_tile_visuals(tile: Node, height_offset: float, x: int, y: int):
+    var mesh_instance: MeshInstance3D = tile.get_node_or_null("MeshInstance3D")
+    if mesh_instance:
+        mesh_instance.visible = false
+    var collision_shape: CollisionShape3D = tile.get_node_or_null("CollisionShape3D")
+    if collision_shape:
+        collision_shape.disabled = true
+    _tint_tile(tile, height_offset, x, y)
 
 func _make_tile_material(height_offset: float, x: int, y: int) -> StandardMaterial3D:
     var mat := StandardMaterial3D.new()
