@@ -68,12 +68,12 @@ func _ensure_default_input():
     _ensure_action("crouch", [_key(KEY_CTRL), _key(KEY_C)])
 
 func _ensure_action(action_name: String, events: Array):
-    if InputMap.has_action(action_name):
-        return
-    InputMap.add_action(action_name)
-    for event in events:
-        if event:
-            InputMap.action_add_event(action_name, event)
+    if not InputMap.has_action(action_name):
+        InputMap.add_action(action_name)
+    if InputMap.action_get_events(action_name).is_empty():
+        for event in events:
+            if event:
+                InputMap.action_add_event(action_name, event)
 
 func _key(code: int) -> InputEventKey:
     var ev := InputEventKey.new()
@@ -170,17 +170,13 @@ func _build_flat_floor():
 
     level_root.add_child(floor_body)
 
-func _create_wall_segment(root: Node3D, size: Vector3, wall_position: Vector3):
+func _create_wall_segment(root: Node3D, size: Vector3, wall_position: Vector3, wall_material: StandardMaterial3D):
     var wall := StaticBody3D.new()
     var mesh_instance := MeshInstance3D.new()
     var mesh := BoxMesh.new()
     mesh.size = size
     mesh_instance.mesh = mesh
-    var mat := StandardMaterial3D.new()
-    mat.albedo_color = Color(0.14, 0.18, 0.22)
-    mat.roughness = 0.52
-    mat.metallic = 0.04
-    mesh_instance.material_override = mat
+    mesh_instance.material_override = wall_material
     mesh_instance.position.y = size.y * 0.5
     wall.add_child(mesh_instance)
 
@@ -198,17 +194,22 @@ func _add_boundary_walls(range: Vector2):
     var boundary := Node3D.new()
     boundary.name = "Boundary"
 
-    var max_height: float = max(range.y + 4.0, 8.0)
+    var max_height: float = max(range.y + 4.0, 8.0) * 3.0
     var thickness := tile_size * 0.6
     var length_x := grid_size.x * tile_size + thickness * 2.0
     var length_z := grid_size.y * tile_size + thickness * 2.0
     var center_x := grid_size.x * tile_size * 0.5
     var center_z := grid_size.y * tile_size * 0.5
 
-    _create_wall_segment(boundary, Vector3(length_x, max_height, thickness), Vector3(center_x, 0, -thickness * 0.5))
-    _create_wall_segment(boundary, Vector3(length_x, max_height, thickness), Vector3(center_x, 0, grid_size.y * tile_size + thickness * 0.5))
-    _create_wall_segment(boundary, Vector3(thickness, max_height, length_z), Vector3(-thickness * 0.5, 0, center_z))
-    _create_wall_segment(boundary, Vector3(thickness, max_height, length_z), Vector3(grid_size.x * tile_size + thickness * 0.5, 0, center_z))
+    var wall_material := StandardMaterial3D.new()
+    wall_material.albedo_color = Color(0.14, 0.18, 0.22)
+    wall_material.roughness = 0.52
+    wall_material.metallic = 0.04
+
+    _create_wall_segment(boundary, Vector3(length_x, max_height, thickness), Vector3(center_x, 0, -thickness * 0.5), wall_material)
+    _create_wall_segment(boundary, Vector3(length_x, max_height, thickness), Vector3(center_x, 0, grid_size.y * tile_size + thickness * 0.5), wall_material)
+    _create_wall_segment(boundary, Vector3(thickness, max_height, length_z), Vector3(-thickness * 0.5, 0, center_z), wall_material)
+    _create_wall_segment(boundary, Vector3(thickness, max_height, length_z), Vector3(grid_size.x * tile_size + thickness * 0.5, 0, center_z), wall_material)
 
     var ceiling := StaticBody3D.new()
     ceiling.name = "Ceiling"
@@ -217,6 +218,7 @@ func _add_boundary_walls(range: Vector2):
     var ceiling_instance := MeshInstance3D.new()
     ceiling_instance.mesh = ceiling_mesh
     ceiling_instance.position = Vector3(center_x, max_height + thickness * 0.5, center_z)
+    ceiling_instance.material_override = wall_material
     var ceiling_collider := CollisionShape3D.new()
     var ceiling_shape := BoxShape3D.new()
     ceiling_shape.size = ceiling_mesh.size
