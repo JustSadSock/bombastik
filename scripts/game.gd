@@ -475,7 +475,7 @@ func _create_conveyor_belt(def: Dictionary, accent_material: StandardMaterial3D,
     var area := Area3D.new()
     area.name = "%s_Area" % name
     area.gravity_space_override = Area3D.SPACE_OVERRIDE_REPLACE
-    area.gravity_vector = direction.normalized()
+    area.gravity_direction = direction.normalized()
     area.gravity = speed
     area.priority = 2
     var shape := BoxShape3D.new()
@@ -793,7 +793,7 @@ func _create_furnace(def: Dictionary, accent_material: StandardMaterial3D, secon
 
     var air_area := Area3D.new()
     air_area.gravity_space_override = Area3D.SPACE_OVERRIDE_COMBINE_REPLACE
-    air_area.gravity_vector = Vector3.UP
+    air_area.gravity_direction = Vector3.UP
     air_area.gravity = force
     var air_shape := CylinderShape3D.new()
     air_shape.radius = radius * 0.72
