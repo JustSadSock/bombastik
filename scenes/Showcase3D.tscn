@@ -1,0 +1,31 @@
+[gd_scene load_steps=3 format=3 uid="uid://cj2hxn8qvr6wg"]
+
+[ext_resource type="Script" path="res://scripts/showcase_3d.gd" id="1_showcase"]
+
+[sub_resource type="Environment" id="Environment_0"]
+background_mode = 1
+background_color = Color(0.12, 0.14, 0.18, 1)
+ambient_light_source = 2
+ambient_light_color = Color(0.3, 0.35, 0.45, 1)
+ambient_light_energy = 0.4
+tonemap_mode = 2
+ssao_enabled = true
+ssil_enabled = true
+glow_enabled = true
+glow_intensity = 0.6
+
+[node name="Showcase3D" type="Node3D"]
+script = ExtResource("1_showcase")
+
+[node name="WorldEnvironment" type="WorldEnvironment" parent="."]
+environment = SubResource("Environment_0")
+
+[node name="DirectionalLight3D" type="DirectionalLight3D" parent="."]
+transform = Transform3D(0.866, -0.25, 0.433, 0, 0.866, 0.5, -0.5, -0.433, 0.75, 5, 8, 5)
+light_color = Color(1, 0.95, 0.9, 1)
+light_energy = 1.2
+shadow_enabled = true
+
+[node name="Camera3D" type="Camera3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 0.98, 0.2, 0, -0.2, 0.98, 0, 1.5, 5)
+fov = 65.0
